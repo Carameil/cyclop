@@ -26,7 +26,17 @@ struct NotchContentView: View {
     /// it has to be visible wherever the panel stands. So the rule is narrow —
     /// only the display that has a real cutout, and only while the panel has
     /// nothing of its own to show.
-    private var paintsShape: Bool { isOpen || !panel.geometry.isPhysical }
+    ///
+    /// "Nothing of its own" is asked of the body rather than of `isOpen`, and
+    /// the difference is not stylistic. The body is the notch exactly when
+    /// there is nothing to show — that is what `bodySize` returns and why —
+    /// so any future state that grows the folded strip paints itself without
+    /// anyone remembering to come back here. Keyed on `isOpen`, the next such
+    /// state would draw its text onto a transparent background: white letters
+    /// standing on the desktop with nothing behind them.
+    private var paintsShape: Bool {
+        !panel.geometry.isPhysical || size != panel.geometry.notchSize
+    }
 
     var body: some View {
         // The shape is wider than the body by `topRadius` on each side: that

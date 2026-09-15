@@ -36,4 +36,8 @@ if [ "${DEVELOPER%/}" = "/Library/Developer/CommandLineTools" ]; then
     )
 fi
 
-exec swift test "${ARGS[@]}" "$@"
+# `${ARGS[@]+...}` вместо простого `${ARGS[@]}`: под `set -u` в bash 3.2 —
+# а это тот bash, что стоит на macOS и на раннере — раскрытие пустого массива
+# считается обращением к неустановленной переменной. При полном Xcode массив
+# как раз пустой.
+exec swift test ${ARGS[@]+"${ARGS[@]}"} "$@"

@@ -229,7 +229,7 @@ bar and without it.
 
 The strip is reached by throwing the pointer up, while a pointer travelling to a
 menu bar icon or a tab stays below it. For the same reason the delay before
-opening is 300 ms here instead of 50. The old full-height notch comes back with a
+opening is 200 ms here instead of 50. The old full-height notch comes back with a
 switch in Settings.
 
 **Now Playing.** In macOS 15.4 the `mediaremoted` daemon began answering only

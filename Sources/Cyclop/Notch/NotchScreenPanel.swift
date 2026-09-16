@@ -152,7 +152,7 @@ final class NotchScreenPanel {
         // bar icons or, with the bar hidden, browser tabs, and a pointer
         // crossing them is usually on its way to one of them. There, staying
         // put is what asks for the panel.
-        pointer.openDelay = geometry.isPhysical ? 0.05 : 0.3
+        pointer.openDelay = geometry.isPhysical ? 0.05 : 0.2
         pointer.isDragging = { [weak root] in root?.isReceivingDrag ?? false }
         pointer.isPanelOpen = { [weak state] in state?.isOpen ?? false }
         pointer.onChange = { [weak self] inside in

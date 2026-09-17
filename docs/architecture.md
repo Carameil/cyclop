@@ -214,20 +214,23 @@ General → Language & Region → "Translation Languages…".
 `safeAreaInsets.top`. On the MacBook Air M4 it was developed on, that is
 179 × 32 pt.
 
-**The collapsed target.** A real notch is a hole, so the panel can claim all of
-it: there is nothing underneath to take a click away from. A synthetic one is
-drawn over a working menu bar, and where the icons reach it the claim shrinks to
-a strip along the very top edge — reached by throwing the pointer up, the same
-gesture as ever, while a pointer travelling to an icon stays below it.
+**The collapsed target.** A real notch is a hole: nothing is drawn over it, and
+the panel can claim all of it, because there is nothing underneath to take a
+click away from.
 
-Which of the two applies is measured per display, not assumed from the machine.
-Status items are windows at the status level, and a window's frame is public
-even though its picture is not, so the leftmost of them can simply be read: they
-begin at x≈757 on one 13-inch Mac and at x≈1158 on another, and on a 1920-point
-external display the notch sits some 550 pt clear of them. A notch the icons do
-not reach behaves like the real one — full depth, and the same 50 ms delay
-instead of 300. The measurement is retaken whenever the panel folds, because
-icons come and go with the apps that own them.
+A notch we draw is an 8-point strip along the very top edge, and the strip is
+what answers the pointer. It used to be drawn the height of the menu bar, which
+holds only while the bar is there: any window in full screen hides it, and on a
+second display macOS paints it only while that display has focus. The shape was
+then left standing on whatever lay underneath — browser tabs, as often as not
+(#109). Whether the bar is showing right now is not something a geometry built
+once can know, so the notch no longer depends on it: a strip is right with the
+bar and without it.
+
+The strip is reached by throwing the pointer up, while a pointer travelling to a
+menu bar icon or a tab stays below it. For the same reason the delay before
+opening is 200 ms here instead of 50. The old full-height notch comes back with a
+switch in Settings.
 
 **Now Playing.** In macOS 15.4 the `mediaremoted` daemon began answering only
 clients it trusts. For an ordinary app that looks like this (checked on 15.7.5

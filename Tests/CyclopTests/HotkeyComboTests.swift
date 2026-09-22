@@ -23,7 +23,7 @@ struct HotkeyComboTests {
     }
 
     @Test func symbolsAndSynonymsAreAccepted() {
-        let combo = HotkeyCenter.Combo.parse("⌥⌘f12")
+        let combo = HotkeyCenter.Combo.parse("⌥+⌘+f12")
         #expect(combo?.keyCode == UInt32(kVK_F12))
         #expect(combo?.modifiers == UInt32(optionKey | cmdKey))
         #expect(HotkeyCenter.Combo.parse("option+command+f12") == combo)
@@ -39,5 +39,10 @@ struct HotkeyComboTests {
         #expect(HotkeyCenter.Combo.parse("ctrl+banana") == nil)
         #expect(HotkeyCenter.Combo.parse("hyper+k") == nil)
         #expect(HotkeyCenter.Combo.parse("") == nil)
+    }
+
+    /// Минус — клавиша, а не разделитель: `cmd+-` должен читаться.
+    @Test func minusIsAKeyNotASeparator() {
+        #expect(HotkeyCenter.Combo.parse("cmd+-")?.keyCode == UInt32(kVK_ANSI_Minus))
     }
 }

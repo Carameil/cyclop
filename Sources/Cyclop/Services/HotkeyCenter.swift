@@ -10,13 +10,13 @@ struct HotkeyCombo: Equatable {
     /// Human-readable, in the order macOS prints them: ⌃⌥⇧⌘.
     let display: String
 
-    /// `cmd+shift+k`, `ctrl+alt+space`, `⌥⌘f12` — case does not matter,
+    /// `cmd+shift+k`, `ctrl+alt+space`, `⌥+⌘+f12` — case does not matter,
     /// neither does the order of the modifiers. At least one modifier is
     /// required: a bare key would swallow that key in every app.
     static func parse(_ text: String) -> HotkeyCombo? {
         let parts = text
             .lowercased()
-            .split(whereSeparator: { $0 == "+" || $0 == " " || $0 == "-" })
+            .split(whereSeparator: { $0 == "+" || $0 == " " })
             .map(String.init)
             .filter { !$0.isEmpty }
         guard let keyName = parts.last, parts.count >= 2 else { return nil }

@@ -88,8 +88,10 @@ struct NormalizerTests {
         """)
     }
 
+    /// Пропущенная запятая, а не лишняя: `{"a":1,}` Foundation на macOS 15
+    /// принимает, так что висящая запятая — не пример невалидного JSON.
     @Test func invalidJSONIsReportedNotSwallowed() {
-        let result = Normalizer.normalize(#"{"a":1,}"#)
+        let result = Normalizer.normalize(#"{"a":1 "b":2}"#)
         #expect(result.kind == .invalid)
         #expect(result.output.isEmpty)
         #expect(result.failure?.isEmpty == false)

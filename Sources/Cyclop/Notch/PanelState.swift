@@ -22,6 +22,13 @@ final class PanelState: ObservableObject {
     /// can recompute what the shared model needs to know about the panels.
     var onChange: (() -> Void)?
 
+    /// Set by the screen's panel: closes it and gives the keyboard back. For
+    /// a pane that was summoned by a key and wants to leave by one — Esc on
+    /// an empty field — without knowing anything about windows.
+    var onDismiss: (() -> Void)?
+
+    func dismiss() { onDismiss?() }
+
     init(geometry: NotchGeometry, vm: NotchViewModel) {
         self.geometry = geometry
         self.vm = vm
@@ -44,7 +51,7 @@ final class PanelState: ObservableObject {
     /// teleprompter — it is a countdown. The extra height buys the paragraph
     /// the reader needs to see coming.
     var openBodySize: CGSize {
-        vm.tab == .teleprompter ? geometry.tallExpandedSize : geometry.expandedSize
+        vm.tab.isTall ? geometry.tallExpandedSize : geometry.expandedSize
     }
 
     /// Size of the visible body for the current state.

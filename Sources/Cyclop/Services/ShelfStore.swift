@@ -146,6 +146,18 @@ final class ShelfStore: ObservableObject {
         persist()
     }
 
+    /// Cards whose files were just moved away by the app itself — no disk
+    /// check, the paths are known. Nothing to do when none of them is here.
+    func remove(urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        let gone = Set(urls.map(\.standardizedFileURL))
+        let ids = Set(items.filter { gone.contains($0.url.standardizedFileURL) }.map(\.id))
+        guard !ids.isEmpty else { return }
+        items.removeAll { ids.contains($0.id) }
+        selection.subtract(ids)
+        persist()
+    }
+
     func clear() {
         items.removeAll()
         selection.removeAll()

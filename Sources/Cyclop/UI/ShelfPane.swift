@@ -3,6 +3,9 @@ import SwiftUI
 struct ShelfPane: View {
     @ObservedObject var shelf: ShelfStore
     var isTargeted: Bool
+    /// Every saved screenshot to the Trash. Lives here as well as in
+    /// Settings because the shelf is where the pile is looked at.
+    var clearScreenshots: () -> Void = {}
 
     /// Which card the pointer is over — decided by the pane, not by the cards.
     ///
@@ -104,6 +107,10 @@ struct ShelfPane: View {
                     .foregroundStyle(Theme.secondary)
             }
             Button("Clear") { shelf.clear() }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.secondary)
+            Button("Trash Screenshots") { clearScreenshots() }
                 .buttonStyle(.plain)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(Theme.secondary)

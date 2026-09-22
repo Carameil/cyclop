@@ -122,3 +122,20 @@
 "Paste the script here" = "Paste the script here";
 "Ready" = "Ready";
 "Done" = "Done";
+
+/* Fork: tools tab, hotkey, clipboard search, screenshot retention. */
+"Tools" = "Tools";
+"Paste" = "Paste";
+"Result" = "Result";
+"Comma-Separated" = "Comma-Separated";
+"Date" = "Date";
+"Unix Timestamp" = "Unix Timestamp";
+"Invalid JSON" = "Invalid JSON";
+"JSON · ids · timestamp" = "JSON · ids · timestamp";
+"%d ids" = "%d ids";
+"Search" = "Search";
+"Nothing matches" = "Nothing matches";
+"Trash Screenshots" = "Trash Screenshots";
+"Keep Only Today's Screenshots" = "Keep Only Today's Screenshots";
+"Panel Hotkey: %@" = "Panel Hotkey: %@";
+"Panel Hotkey: Off" = "Panel Hotkey: Off";

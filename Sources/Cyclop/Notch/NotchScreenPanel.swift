@@ -22,6 +22,13 @@ final class NotchScreenPanel {
     /// `NotchController.updatePin` for why it is granted to a single screen.
     var isPinned = false
 
+    /// Whether the panel was opened by the hotkey with the pointer elsewhere.
+    /// Until the pointer arrives, its absence must not count as leaving —
+    /// otherwise the panel would fold the instant it opened. The first hover
+    /// hands control back to the pointer; Esc, a click into another app and
+    /// every other reason to close still close it.
+    private var isSummoned = false
+
     private let vm: NotchViewModel
     private let pointer = PointerWatcher()
     private var panel: NotchPanel?
@@ -53,6 +60,32 @@ final class NotchScreenPanel {
     func toggle() {
         setOpen(!state.isOpen)
         pointer.setInside(state.isOpen)
+    }
+
+    /// From the hotkey: opens on `tab` and takes the keyboard, wherever the
+    /// pointer is. Pressed again on the same tab, it closes — one key, both
+    /// ways.
+    func summon(_ tab: NotchViewModel.Tab) {
+        if state.isOpen, vm.tab == tab {
+            dismiss()
+            return
+        }
+        // Summoned only when the pointer is genuinely elsewhere. With the
+        // pointer already on the panel the usual rule holds from the start,
+        // and leaving closes it like any other hover.
+        let body = tab.isTall ? geometry.tallExpandedSize : geometry.expandedSize
+        isSummoned = !geometry.hoverRect(for: body).contains(NSEvent.mouseLocation)
+        state.select(tab)
+        setOpen(true)
+        pointer.setInside(true)
+        if tab.needsKeyboard { state.wantsKeyboard = true }
+    }
+
+    /// Closes and lets go of the keyboard, whatever opened it.
+    func dismiss() {
+        state.wantsKeyboard = false
+        setOpen(false)
+        pointer.setInside(false)
     }
 
     /// Same display, same notch, moved: keep the panel and everything on it.
@@ -131,6 +164,8 @@ final class NotchScreenPanel {
             state.wantsKeyboard = true
         }
 
+        state.onDismiss = { [weak self] in self?.dismiss() }
+
         panel.contentView = root
         panel.ignoresMouseEvents = true
         panel.setFrame(geometry.windowFrame, display: false)
@@ -161,7 +196,9 @@ final class NotchScreenPanel {
             // Guarded here rather than inside `setOpen` so that the reasons
             // that are not the pointer, like the screen going to sleep, still
             // close a running teleprompter.
-            if !inside, holdsOpen { return }
+            if !inside, holdsOpen || isSummoned { return }
+            // The pointer has arrived; from here on it decides as usual.
+            if inside { isSummoned = false }
             setOpen(inside)
         }
         // Everything outside the visible panel must reach the app underneath:
@@ -263,6 +300,7 @@ final class NotchScreenPanel {
     /// would be a panel stuck open on a screen nobody is looking at.
     private func setOpen(_ open: Bool) {
         guard state.isOpen != open else { return }
+        if !open { isSummoned = false }
         // Closing ends the take, but only on the screen reading it: the pin is
         // a consequence of the script moving, so the script stops with the
         // panel it is moving on — and not with any other panel folding away.

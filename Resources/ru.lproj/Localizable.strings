@@ -121,3 +121,20 @@
 "Paste the script here" = "Вставьте сюда сценарий";
 "Ready" = "Готово";
 "Done" = "Готово";
+
+/* Форк: вкладка инструментов, хоткей, поиск по буферу, хранение снимков. */
+"Tools" = "Инструменты";
+"Paste" = "Вставь";
+"Result" = "Результат";
+"Comma-Separated" = "Через запятую";
+"Date" = "Дата";
+"Unix Timestamp" = "Unix-время";
+"Invalid JSON" = "JSON не читается";
+"JSON · ids · timestamp" = "JSON · id · timestamp";
+"%d ids" = "%d id";
+"Search" = "Поиск";
+"Nothing matches" = "Ничего не найдено";
+"Trash Screenshots" = "Снимки в Корзину";
+"Keep Only Today's Screenshots" = "Хранить только сегодняшние снимки";
+"Panel Hotkey: %@" = "Хоткей панели: %@";
+"Panel Hotkey: Off" = "Хоткей панели: выключен";

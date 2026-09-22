@@ -11,12 +11,16 @@ final class NotchController {
     private var vm: NotchViewModel?
     private var panels: [CGDirectDisplayID: NotchScreenPanel] = [:]
     private var cancellables = Set<AnyCancellable>()
+    private let hotkey = HotkeyCenter()
 
     func install() {
         let vm = NotchViewModel()
         self.vm = vm
         vm.start()
         rebuild()
+
+        hotkey.onPress = { [weak self] in self?.summonTools() }
+        hotkey.install(ConfigStore.shared.hotkey)
 
         for name in [
             NSApplication.didChangeScreenParametersNotification,
@@ -47,6 +51,7 @@ final class NotchController {
     }
 
     func teardown() {
+        hotkey.uninstall()
         vm?.stop()
         panels.values.forEach { $0.teardown() }
     }
@@ -55,6 +60,15 @@ final class NotchController {
     /// already on, since that is the screen being looked at.
     func toggle() {
         target()?.toggle()
+    }
+
+    /// From the hotkey: the panel on the pointer's display, opened straight
+    /// onto the tools tab with the keyboard taken, so the next keystroke is
+    /// already the paste. With the tab switched off the panel still opens,
+    /// on whatever tab is showing — a key that does nothing is a broken key.
+    func summonTools() {
+        guard let vm, let panel = target() else { return }
+        panel.summon(vm.isVisible(.tools) ? .tools : vm.tab)
     }
 
     /// What the menu bar switches. Handed out rather than wrapped: the menu

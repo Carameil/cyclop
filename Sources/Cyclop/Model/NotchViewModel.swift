@@ -4,7 +4,7 @@ import Combine
 @MainActor
 final class NotchViewModel: ObservableObject {
     enum Tab: String, CaseIterable, Identifiable {
-        case media, shelf, clipboard, snippets, calendar, translate, currency, notes, teleprompter, settings
+        case media, shelf, clipboard, snippets, calendar, translate, currency, notes, teleprompter, tools, settings
         var id: String { rawValue }
 
         var symbol: String {
@@ -18,6 +18,7 @@ final class NotchViewModel: ObservableObject {
             case .currency: return "dollarsign.circle"
             case .notes: return "note.text"
             case .teleprompter: return "text.viewfinder"
+            case .tools: return "wand.and.stars"
             case .settings: return "gearshape.fill"
             }
         }
@@ -33,6 +34,7 @@ final class NotchViewModel: ObservableObject {
             case .currency: return localized("Currency")
             case .notes: return localized("Notes")
             case .teleprompter: return localized("Teleprompter")
+            case .tools: return localized("Tools")
             case .settings: return localized("Settings")
             }
         }
@@ -40,12 +42,17 @@ final class NotchViewModel: ObservableObject {
         /// Tabs with a field in them. Landing on one hands it the keyboard, so
         /// that arriving and typing is a single move.
         var needsKeyboard: Bool {
-            self == .translate || self == .currency || self == .snippets || self == .notes
+            self == .translate || self == .currency || self == .snippets || self == .notes || self == .tools
         }
 
         /// Every tab can be taken off the rail except the one the switches
         /// live on: with Settings gone there would be no way back.
         var canHide: Bool { self != .settings }
+
+        /// Tabs that take the taller body. The teleprompter needs the room for
+        /// a paragraph; the tools tab needs it for a formatted JSON document,
+        /// which is read top to bottom and is useless cut off at two lines.
+        var isTall: Bool { self == .teleprompter || self == .tools }
 
         /// Which rail the icon sits on. The left one carries the original six
         /// and is full — icon height is a ceiling now, not a constant (#26,
@@ -61,7 +68,7 @@ final class NotchViewModel: ObservableObject {
         /// calendar, so it sits last, furthest from the tabs people actually
         /// rest on.
         static let leftRail: [Tab] = [.media, .shelf, .clipboard, .snippets, .calendar, .translate]
-        static let rightRail: [Tab] = [.notes, .currency, .teleprompter, .settings]
+        static let rightRail: [Tab] = [.tools, .notes, .currency, .teleprompter, .settings]
     }
 
     /// What every screen's panel adds up to, kept by `NotchController`: this
@@ -139,7 +146,7 @@ final class NotchViewModel: ObservableObject {
             screenshotFolder.resumeIfEnabled()
         case .currency:
             currencies.start()
-        case .snippets, .translate, .notes, .teleprompter, .settings:
+        case .snippets, .translate, .notes, .teleprompter, .tools, .settings:
             break
         }
     }
@@ -151,7 +158,7 @@ final class NotchViewModel: ObservableObject {
         case .calendar: calendar.stop()
         case .shelf: screenshotFolder.stop()
         case .currency: currencies.stop()
-        case .snippets, .translate, .notes, .teleprompter, .settings: break
+        case .snippets, .translate, .notes, .teleprompter, .tools, .settings: break
         }
     }
 
@@ -175,7 +182,7 @@ final class NotchViewModel: ObservableObject {
     /// second. With a script in it the tab is read, not written, and a click
     /// on play must not dim the caret of the window underneath.
     var clickTakesKeyboard: Bool {
-        tab.needsKeyboard || (tab == .teleprompter && teleprompter.script.isEmpty)
+        tab.needsKeyboard || tab == .clipboard || (tab == .teleprompter && teleprompter.script.isEmpty)
     }
 
     @Published var tab: Tab = .media {
@@ -230,10 +237,12 @@ final class NotchViewModel: ObservableObject {
     let snippets: SnippetStore
     let notes: NoteStore
     let teleprompter: TeleprompterStore
+    let tools = ToolsStore()
     /// Shared by every pane that shows something worth not showing.
     let privacy = PrivacyMode()
 
     private var cancellables = Set<AnyCancellable>()
+    private var dayChangeObserver: NSObjectProtocol?
 
     init() {
         self.media = MediaController()
@@ -320,13 +329,37 @@ final class NotchViewModel: ObservableObject {
         for target in Tab.allCases where isVisible(target) { startBackground(of: target) }
         // The default tab may have been switched off in a previous session.
         if !isVisible(tab) { tab = firstVisibleTab }
+
+        // Retention is checked at launch and at midnight, not on a timer: the
+        // rule is "today's screenshots", and the day changes exactly once.
+        purgeScreenshots()
+        dayChangeObserver = NotificationCenter.default.addObserver(
+            forName: .NSCalendarDayChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.purgeScreenshots() }
+        }
     }
 
     func stop() {
         started = false
+        if let dayChangeObserver { NotificationCenter.default.removeObserver(dayChangeObserver) }
+        dayChangeObserver = nil
         for target in Tab.allCases { stopBackground(of: target) }
         // Whatever was typed makes it to disk even when quitting mid-thought.
         notes.flush()
+    }
+
+    /// Sends screenshots older than the configured retention to the Trash and
+    /// takes their cards off the shelf by path, without touching the disk for
+    /// the cards that stay — those may live in folders macOS guards.
+    func purgeScreenshots() {
+        let gone = ScreenshotVault.purge(keepingDays: ConfigStore.shared.screenshotRetentionDays)
+        shelf.remove(urls: gone)
+    }
+
+    /// The shelf's own button: every saved screenshot to the Trash, now.
+    func clearScreenshots() {
+        shelf.remove(urls: ScreenshotVault.clear())
     }
 
     /// A screenshot that arrived on its own — copied elsewhere, or synced

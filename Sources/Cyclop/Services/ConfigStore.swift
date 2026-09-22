@@ -32,6 +32,8 @@ final class ConfigStore: ObservableObject {
         var teleprompter = Teleprompter()
         var hiddenTabs: [String] = []
         var fullSizeDrawnNotch = false
+        var hotkey = "ctrl+alt+space"
+        var screenshotRetentionDays = 0
 
         init() {}
 
@@ -49,6 +51,8 @@ final class ConfigStore: ObservableObject {
             teleprompter = try c.decodeIfPresent(Teleprompter.self, forKey: .teleprompter) ?? d.teleprompter
             hiddenTabs = try c.decodeIfPresent([String].self, forKey: .hiddenTabs) ?? d.hiddenTabs
             fullSizeDrawnNotch = try c.decodeIfPresent(Bool.self, forKey: .fullSizeDrawnNotch) ?? d.fullSizeDrawnNotch
+            hotkey = try c.decodeIfPresent(String.self, forKey: .hotkey) ?? d.hotkey
+            screenshotRetentionDays = try c.decodeIfPresent(Int.self, forKey: .screenshotRetentionDays) ?? d.screenshotRetentionDays
         }
     }
 
@@ -130,6 +134,22 @@ final class ConfigStore: ObservableObject {
     var hiddenTabs: [String] {
         get { value.hiddenTabs }
         set { value.hiddenTabs = newValue; persist() }
+    }
+
+    /// The key combination that summons the panel, as text — see
+    /// `HotkeyCenter.Combo.parse` for what it accepts. Empty turns it off.
+    /// Edited in the file, not in the panel: a shortcut is set once.
+    var hotkey: String {
+        get { value.hotkey }
+        set { value.hotkey = newValue; persist() }
+    }
+
+    /// How many days of saved screenshots to keep; 0 keeps them forever,
+    /// which is the upstream behaviour and the default. 1 means today's
+    /// only — everything older goes to the Trash at launch and at midnight.
+    var screenshotRetentionDays: Int {
+        get { value.screenshotRetentionDays }
+        set { value.screenshotRetentionDays = max(0, newValue); persist() }
     }
 
     // MARK: - Migration

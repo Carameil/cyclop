@@ -18,6 +18,7 @@ struct SettingsPane: View {
     @State private var allDisplays = NotchGeometry.showsOnAllDisplays
     @State private var fullSizeNotch = NotchGeometry.drawsFullSizeNotch
     @State private var watchScreenshotFolder = false
+    @State private var clearScreenshotsDaily = ConfigStore.shared.screenshotRetentionDays > 0
     @State private var screenshotUsage: (files: Int, bytes: Int64) = (0, 0)
 
     var body: some View {
@@ -37,6 +38,12 @@ struct SettingsPane: View {
                         title: localized("Show Menu Bar Icon"),
                         isOn: menuBarIconVisibleBinding
                     )
+                    // Shown, not edited: a shortcut is set once, and a recorder
+                    // in a panel that closes when the pointer leaves would be
+                    // the fiddliest control in the app. The row opens the file.
+                    actionRow(symbol: "keyboard", title: hotkeyTitle) {
+                        ConfigStore.reveal()
+                    }
                 }
 
                 // The rail is for what gets a glance between other things.
@@ -74,6 +81,11 @@ struct SettingsPane: View {
                         symbol: "eye",
                         title: localized("Watch Screenshots Folder"),
                         isOn: watchScreenshotFolderBinding
+                    )
+                    toggleRow(
+                        symbol: "clock.arrow.circlepath",
+                        title: localized("Keep Only Today's Screenshots"),
+                        isOn: clearScreenshotsDailyBinding
                     )
                     actionRow(symbol: "folder", title: localized("Show Screenshots Folder")) {
                         ScreenshotVault.reveal()
@@ -136,8 +148,14 @@ struct SettingsPane: View {
             allDisplays = NotchGeometry.showsOnAllDisplays
             fullSizeNotch = NotchGeometry.drawsFullSizeNotch
             watchScreenshotFolder = screenshots.isEnabled
+            clearScreenshotsDaily = config.screenshotRetentionDays > 0
             refreshUsage()
         }
+    }
+
+    private var hotkeyTitle: String {
+        guard let combo = HotkeyCenter.Combo.parse(config.hotkey) else { return localized("Panel Hotkey: Off") }
+        return localized("Panel Hotkey: %@", combo.display)
     }
 
     private var clearTitle: String {
@@ -178,6 +196,23 @@ struct SettingsPane: View {
         Binding(
             get: { vm.isVisible(tab) },
             set: { wants in vm.setVisible(tab, wants) }
+        )
+    }
+
+    /// On means one day of retention: what was taken since midnight stays,
+    /// the rest goes to the Trash at launch and when the day changes. The
+    /// number of days is in `config.json` for anyone who wants a week.
+    private var clearScreenshotsDailyBinding: Binding<Bool> {
+        Binding(
+            get: { clearScreenshotsDaily },
+            set: { wants in
+                clearScreenshotsDaily = wants
+                config.screenshotRetentionDays = wants ? 1 : 0
+                if wants {
+                    vm.purgeScreenshots()
+                    refreshUsage()
+                }
+            }
         )
     }
 

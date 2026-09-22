@@ -11,6 +11,18 @@ files, clipboard history and your next meetings.
 
 ![The Cyclop panel](docs/panel.png)
 
+## This fork
+
+A personal fork of [akalikbergenov/cyclop](https://github.com/akalikbergenov/cyclop)
+with a few additions for everyday backend work. Everything upstream is kept as is.
+
+| Addition | What it does |
+|---|---|
+| **Tools tab** | Paste on the left, result on the right. Minified JSON comes out indented with keys in their original order; a column of ids comes out comma-separated; a unix timestamp comes out as a date, and a date as a timestamp. Copy with one click |
+| **Hotkey** | `⌃⌥Space` opens the panel on the Tools tab wherever the pointer is, with the keyboard already taken. Esc on an empty field closes it. The combination is `hotkey` in `config.json`; empty turns it off. No Accessibility permission needed |
+| **Clipboard search** | A filter above the history, for when forty rows is too many to scan |
+| **Screenshot retention** | Settings → "Keep Only Today's Screenshots": everything older goes to the Trash at launch and at midnight. Off by default, as upstream. `screenshotRetentionDays` in `config.json` for any other window. The shelf also gets a "Trash Screenshots" button |
+
 **[Download the latest version](https://github.com/akalikbergenov/cyclop/releases/latest)** —
 macOS 15 or newer. The first launch needs one permission granted by hand,
 [here is how](#installation).

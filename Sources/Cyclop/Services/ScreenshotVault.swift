@@ -65,13 +65,46 @@ enum ScreenshotVault {
     /// To the Trash, not gone. The folder's promise is that nothing in it is
     /// ever deleted behind the user's back; the menu item is the user's own
     /// hand, and the Trash keeps even that reversible.
-    static func clear() {
+    @discardableResult
+    static func clear() -> [URL] {
         let fm = FileManager.default
         guard let urls = try? fm.contentsOfDirectory(
             at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
-        ) else { return }
-        for url in urls {
-            try? fm.trashItem(at: url, resultingItemURL: nil)
+        ) else { return [] }
+        return trash(urls)
+    }
+
+    /// Retention: everything created before the day window goes to the
+    /// Trash. `days` counts calendar days including today, so 1 keeps only
+    /// what was taken since midnight; 0 or less keeps everything and is the
+    /// promise the folder used to make. Returns what was trashed, so the
+    /// shelf can drop those cards by path.
+    @discardableResult
+    static func purge(keepingDays days: Int, now: Date = Date()) -> [URL] {
+        guard days > 0 else { return [] }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        guard let cutoff = calendar.date(byAdding: .day, value: -(days - 1), to: today) else { return [] }
+        return trash(expired(in: folder, before: cutoff))
+    }
+
+    /// Files in `folder` created before `cutoff`. Pure — the part worth a
+    /// test, kept apart from the Trash call that is not.
+    static func expired(in folder: URL, before cutoff: Date) -> [URL] {
+        let fm = FileManager.default
+        guard let urls = try? fm.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: [.creationDateKey, .isRegularFileKey], options: [.skipsHiddenFiles]
+        ) else { return [] }
+        return urls.filter { url in
+            guard let values = try? url.resourceValues(forKeys: [.creationDateKey, .isRegularFileKey]),
+                  values.isRegularFile == true,
+                  let created = values.creationDate else { return false }
+            return created < cutoff
         }
+    }
+
+    private static func trash(_ urls: [URL]) -> [URL] {
+        let fm = FileManager.default
+        return urls.filter { (try? fm.trashItem(at: $0, resultingItemURL: nil)) != nil }
     }
 }

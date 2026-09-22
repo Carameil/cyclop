@@ -132,6 +132,8 @@ struct NotchContentView: View {
             NotesCounter(notes: vm.notes)
         case .teleprompter:
             EmptyView()
+        case .tools:
+            ToolsKindBadge(tools: vm.tools)
         case .settings:
             EmptyView()
         }
@@ -186,7 +188,7 @@ struct NotchContentView: View {
         case .media:
             MediaPane(media: vm.media)
         case .shelf:
-            ShelfPane(shelf: vm.shelf, isTargeted: panel.isDropTargeted)
+            ShelfPane(shelf: vm.shelf, isTargeted: panel.isDropTargeted, clearScreenshots: { vm.clearScreenshots() })
         case .clipboard:
             ClipboardPane(clipboard: vm.clipboard, privacy: vm.privacy)
         case .calendar:
@@ -201,6 +203,8 @@ struct NotchContentView: View {
             NotesPane(notes: vm.notes, privacy: vm.privacy, wantsKeyboard: $panel.wantsKeyboard)
         case .teleprompter:
             TeleprompterPane(prompter: vm.teleprompter, wantsKeyboard: $panel.wantsKeyboard)
+        case .tools:
+            ToolsPane(tools: vm.tools, wantsKeyboard: $panel.wantsKeyboard, dismiss: { panel.dismiss() })
         case .settings:
             SettingsPane(vm: vm, shelf: vm.shelf, screenshots: vm.screenshotFolder)
         }

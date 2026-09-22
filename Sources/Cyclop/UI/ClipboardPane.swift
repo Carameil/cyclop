@@ -4,6 +4,18 @@ struct ClipboardPane: View {
     @ObservedObject var clipboard: ClipboardStore
     @ObservedObject var privacy: PrivacyMode
 
+    /// Forty rows is past what the eye scans. The filter is a plain
+    /// substring match on the preview, and it lives in the pane: leaving
+    /// the tab drops it, which is the right default for a search typed in
+    /// passing.
+    @State private var query = ""
+
+    private var shown: [ClipItem] {
+        let needle = query.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty else { return clipboard.items }
+        return clipboard.items.filter { $0.preview.localizedCaseInsensitiveContains(needle) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if clipboard.items.isEmpty {
@@ -12,18 +24,57 @@ struct ClipboardPane: View {
                     .foregroundStyle(Theme.tertiary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 3) {
-                        ForEach(clipboard.items) { item in
-                            ClipRow(item: item, clipboard: clipboard, privacy: privacy)
+                search
+                if shown.isEmpty {
+                    Text("Nothing matches")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.tertiary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 3) {
+                            ForEach(shown) { item in
+                                ClipRow(item: item, clipboard: clipboard, privacy: privacy)
+                            }
                         }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
                 }
                 footer
             }
         }
         .padding(.top, 2)
+    }
+
+    /// Takes the keyboard on click, like a field in any other tab — the
+    /// panel does not claim it on hover here, because most visits to this
+    /// tab are a glance and a click on a row, not a search.
+    private var search: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.tertiary)
+            TextField("Search", text: $query)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundStyle(.white)
+                .tint(Theme.secondary)
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 24)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Theme.surface)
+        )
+        .padding(.bottom, 2)
     }
 
     private var footer: some View {

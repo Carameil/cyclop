@@ -6,8 +6,7 @@ The MacBook notch as a working tool. A native SwiftUI/AppKit app: invisible at
 rest, and on hover it unfolds downwards into a panel with a player, a shelf for
 files, clipboard history and your next meetings.
 
-[![build](https://github.com/akalikbergenov/cyclop/actions/workflows/build.yml/badge.svg)](https://github.com/akalikbergenov/cyclop/actions/workflows/build.yml)
-[![Buy Me a Coffee](https://img.shields.io/badge/buy%20me%20a%20coffee-%E2%98%95-FFDD00?style=flat-square&labelColor=000000)](https://buymeacoffee.com/akalikbergenov)
+[![build](https://github.com/Carameil/cyclop/actions/workflows/build.yml/badge.svg)](https://github.com/Carameil/cyclop/actions/workflows/build.yml)
 
 ![The Cyclop panel](docs/panel.png)
 
@@ -18,14 +17,18 @@ with a few additions for everyday backend work. Everything upstream is kept as i
 
 | Addition | What it does |
 |---|---|
-| **Tools tab** | Paste on the left, result on the right. Minified JSON comes out indented with keys in their original order; a column of ids comes out comma-separated; a unix timestamp comes out as a date, and a date as a timestamp. Copy with one click |
+| **Tools tab** | Paste on the left, result on the right. Minified JSON comes out indented with keys in their original order; a column of ids comes out comma-separated; a unix timestamp comes out as a date, and a date as a timestamp. A click on the result copies it |
 | **Hotkey** | `⌃⌥Space` opens the panel on the Tools tab wherever the pointer is, with the keyboard already taken. Esc on an empty field closes it. The combination is `hotkey` in `config.json`; empty turns it off. No Accessibility permission needed |
 | **Clipboard search** | A filter above the history, for when forty rows is too many to scan |
 | **Screenshot retention** | Settings → "Keep Only Today's Screenshots": everything older goes to the Trash at launch and at midnight. Off by default, as upstream. `screenshotRetentionDays` in `config.json` for any other window. The shelf also gets a "Trash Screenshots" button |
+| **Volume** | A system volume slider next to the player controls on the Music tab. It drives the default output device and is not shown when that device's volume cannot be set |
+| **Calendar by day** | The meeting list shows one day at a time: today first, arrows step through the week. Each occurrence of a recurring meeting is its own row |
+| **Settings** | The per-tab switches in "Show in Panel" fold into a single "Tabs" row with an "N of M" counter |
+| **Deploy with make** | `make install` builds the app and puts it into `/Applications`, `make update` pulls first — [Building](#building) |
 
-**[Download the latest version](https://github.com/akalikbergenov/cyclop/releases/latest)** —
-macOS 15 or newer. The first launch needs one permission granted by hand,
-[here is how](#installation).
+The fork has no releases of its own: the images on the upstream releases page
+are built without these additions. It is installed from source,
+[here is how](#building). macOS 15 or newer.
 
 ```
 0.0 % CPU at rest  ·  ≈40 MB + 14 MB helper  ·  3.7 MB bundle  ·  one permission, and only on a button
@@ -43,7 +46,7 @@ that works is below.
 | **Shelf** | Drag files into the notch and they stay there until needed; drag a card out and the file goes wherever it is dropped. A click selects a card, ⌘-click selects several, and then the whole group is dragged. A screenshot taken to the clipboard is saved as a file and lands here too — including one taken on an iPhone, if you copy it there |
 | **Clipboard** | The last 40 copies; a click puts an entry back on the clipboard |
 | **Snippets** | A hand-kept list of what you are tired of retyping: an address, a phone number, an email. Added with a button in the panel, removed with the cross on a card; a click puts the text on the clipboard. The same list lives in `~/Library/Application Support/Cyclop/snippets.json` and can be edited there instead |
-| **Calendar** | The next meeting a week ahead: how long until it starts and a button that joins the call — Zoom, Meet, Teams and others. The rest of the meetings as a list |
+| **Calendar** | The next meeting a week ahead: how long until it starts and a button that joins the call — Zoom, Meet, Teams and others. The rest of the meetings as a list, one day at a time |
 | **Translate** | Type on the left, the translation appears on the right — by itself, offline, using macOS's own facilities. English goes to Russian, Russian to English; the direction comes from the script the text is written in. macOS does not preinstall language packs, so the first time you have to download one: System Settings → General → Language & Region → "Translation Languages…" |
 | **Currency** | An amount on one side, the other currency on the other; type into either. Rates are the one thing in Cyclop that comes over the network — a public table of daily rates, fetched once an hour, and only while the tab is on |
 | **Teleprompter** | A script that scrolls under the camera at a speed you set. The notch is the one place on the screen a teleprompter belongs: reading happens right beside the lens, so on the recording the eyes stay on the camera instead of travelling to a window below it. The panel holds itself open while the text is moving — reading a script means not touching the trackpad |
@@ -68,6 +71,11 @@ use it can take it off.
 
 - macOS 15 or newer (the Translate tab runs on Translation.framework)
 - Swift 6 toolchain (the full Xcode is not needed, Command Line Tools are enough)
+- `make` — ships with Command Line Tools
+
+On macOS 27 with Command Line Tools only, the build switches to the 26.x SDK
+installed alongside by itself (`Scripts/sdk.sh`): the plugin behind `@State`
+in SDK 27 comes with Xcode alone. With the full Xcode nothing changes.
 
 The app works on Macs without a notch too: the panel then treats a 180 × 24 pt
 area at the top centre of the screen as one.
@@ -75,14 +83,19 @@ area at the top centre of the screen as one.
 ## Building
 
 ```bash
-git clone https://github.com/akalikbergenov/cyclop.git
+git clone https://github.com/Carameil/cyclop.git
 cd cyclop
-./Scripts/bundle.sh          # swift build + assemble the .app + ad-hoc sign
-open build/Cyclop.app
+make install
 ```
 
-To update an installed build: `make update` pulls the current branch, rebuilds,
-replaces `/Applications/Cyclop.app` and relaunches it.
+| Command | What it does |
+|---|---|
+| `make build` | `Scripts/bundle.sh`: swift build, assembles `build/Cyclop.app`, signs it — ad-hoc, or with the certificate in `CODESIGN_IDENTITY` |
+| `make install` | `make build`, then quits the running Cyclop, replaces `/Applications/Cyclop.app` and launches it |
+| `make update` | `git pull --ff-only` on the current branch, then `make install`. Stops if the branch has diverged from its upstream |
+| `make test` | `Scripts/test.sh`: `swift test`, with Command Line Tools as well |
+
+To try a build without installing it: `make build && open build/Cyclop.app`.
 
 The icon is generated in code, with no graphics editor involved:
 
@@ -92,23 +105,47 @@ swift Scripts/make-icon.swift "$PWD/Resources/AppIcon.icns"
 
 ## Installation
 
-Open `Cyclop-<version>.dmg` and drag the app into Applications. It opens on
-the first try: since 0.8.0 the image is signed with a Developer ID and
-notarised by Apple, so there is nothing to allow and nothing to type.
+The fork is installed with `make install` and updated with `make update`, see
+[Building](#building). The version is the first line of the menu bar menu.
 
-Updating works the same way: open the new image and replace the app. Coming
-from a version before 0.8.0, macOS may ask for the calendar permission once
-more — the app's signature changed, and that is what the permission was tied
-to. The version is the first line of the menu bar menu.
+A build from source is not notarised. On the Mac that built it, it opens
+straight away; on any other Mac the first launch goes through **System
+Settings → Privacy & Security → "Open Anyway"**.
 
-A build from source (`Scripts/bundle.sh`) is ad-hoc signed and is not
-notarised, so on any Mac but the one that built it the first launch goes
-through **System Settings → Privacy & Security → "Open Anyway"**. Releases do
-not have this step.
+### Calendar access across updates
 
-Releases come often, and a star does not announce them — it is a bookmark, not a
-subscription. To hear about updates: the **Watch** button at the top right →
-**Custom** → tick **Releases**. Only releases will arrive, no issues or pushes.
+By default the build is ad-hoc signed, and an ad-hoc signature is the hash of
+the binary. macOS ties the calendar permission to the signature, so after every
+`make update` that brings code changes Cyclop asks for full access again. A
+self-signed certificate keeps the signature the same from build to build.
+Set it up once:
+
+1. Keychain Access → Keychain Access menu → Certificate Assistant → Create a
+   Certificate…: name `Cyclop Local`, Identity Type "Self Signed Root",
+   Certificate Type "Code Signing". The default validity is a year; for longer,
+   tick "Let me override defaults" and set the period, e.g. 3650 days. A new
+   certificate is a new signature, and the permission will be asked once more.
+2. Add to `~/.zshrc`:
+   ```bash
+   export CODESIGN_IDENTITY="Cyclop Local"
+   ```
+3. `make install`. The first time, macOS asks whether codesign may use the
+   key — "Always Allow"; the calendar is asked one last time.
+
+Check: `codesign -d -r- /Applications/Cyclop.app` should print `certificate`
+instead of `cdhash`. If codesign says the certificate is not trusted, open it in
+Keychain Access → Trust → Code Signing: "Always Trust".
+
+Such a build is signed the same way as an ad-hoc one, only with the certificate:
+no hardened runtime and no timestamp — those are kept for Developer ID
+(`Scripts/bundle.sh`).
+
+Upstream images, `Cyclop-<version>.dmg` from the
+[upstream releases page](https://github.com/akalikbergenov/cyclop/releases), are
+signed with a Developer ID and notarised by Apple, so they open on the first
+try — but without the fork's additions. Switching between such an image and a
+local build changes the app's signature, and macOS may ask for the calendar
+permission once more: that is what the permission is tied to.
 
 ### Building the image yourself
 
@@ -137,8 +174,10 @@ into the app's `Info.plist`, into the image name and into the tag, so they canno
 drift apart. The script also refuses to run on a dirty tree, on unpushed commits,
 or when the tag already exists.
 
-Built images live on the [releases page](https://github.com/akalikbergenov/cyclop/releases) —
-that is the link to hand to people instead of a file.
+The image itself is built by `.github/workflows/release.yml` on the tag push, and
+without Developer ID and notarisation secrets in the repository it refuses to
+publish — see [docs/signing.md](docs/signing.md). Without them the fork is
+deployed with `make install`.
 
 ## Permissions
 
@@ -229,41 +268,13 @@ Sources/Cyclop
 │   ├── CurrencyStore.swift    rates over the network, the one tab that has any
 │   ├── TeleprompterStore.swift the script and where reading it has got to
 │   ├── ScreenshotFolderWatcher.swift  screenshots saved to disk, onto the shelf
-│   └── CalendarStore.swift    EventKit: next meetings and the call link
+│   ├── CalendarStore.swift    EventKit: next meetings and the call link
+│   ├── ToolsStore.swift       the Tools tab's text: what was pasted, what it became
+│   ├── Normalizer.swift       JSON, id columns, unix time: the transformations
+│   ├── HotkeyCenter.swift     global hotkey via Carbon, no Accessibility
+│   └── SystemVolume.swift     CoreAudio: volume of the default output device
 └── UI/                        NotchShape, tab panes, theme
 
 Sources/CyclopMediaHelper
 └── helper.m                   dylib for /usr/bin/perl: MediaRemote -> JSON
 ```
-
-## Contributing
-
-The rules are short and live in [CONTRIBUTING.md](CONTRIBUTING.md): what gets
-taken, what does not, and what to check before sending. The main one is that
-the app works without macOS permissions and without the network, and a change
-that alters this is a separate conversation.
-
-What the app reads, what it keeps and where, where it goes on the network —
-[SECURITY.md](SECURITY.md). The channel for vulnerabilities is there too:
-private, no issue needed.
-
-## Thanks
-
-The app is free — no subscriptions, no ads, no data collection — and will stay
-that way. If it turned out useful and you feel like supporting it:
-
-**[☕ Buy Me a Coffee](https://buymeacoffee.com/akalikbergenov)**
-
-Special thanks to everyone who showed up in the first days and made the app
-better: [@DontTrustMexD](https://github.com/DontTrustMexD),
-[@a58becde](https://github.com/a58becde),
-[@ispy4you](https://github.com/ispy4you),
-[@iFuzYs](https://github.com/iFuzYs),
-[@zhd-dm](https://github.com/zhd-dm),
-[@komekovars](https://github.com/komekovars),
-[@superkai-sdk1](https://github.com/superkai-sdk1),
-[@Ariet2003](https://github.com/Ariet2003).
-
-## Licence
-
-MIT

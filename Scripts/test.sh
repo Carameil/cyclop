@@ -35,6 +35,10 @@ if [ "${DEVELOPER%/}" = "/Library/Developer/CommandLineTools" ]; then
         -Xlinker -rpath -Xlinker "$FRAMEWORKS"
         -Xlinker -rpath -Xlinker "$LIBS"
     )
+    TESTING_PLUGINS="$DEVELOPER/usr/lib/swift/host/plugins/testing"
+    if [ -d "$TESTING_PLUGINS" ]; then
+        ARGS+=(-Xswiftc -plugin-path -Xswiftc "$TESTING_PLUGINS")
+    fi
 fi
 
 # `${ARGS[@]+...}` вместо простого `${ARGS[@]}`: под `set -u` в bash 3.2 —

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds Cyclop.app without Xcode: SwiftPM produces the binary, this script
-# assembles the bundle around it and signs it — ad-hoc by default, with a
-# Developer ID when CODESIGN_IDENTITY names one.
+# assembles the bundle around it and signs it — ad-hoc by default, with the
+# certificate CODESIGN_IDENTITY names otherwise.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -79,7 +79,16 @@ clang -dynamiclib -fobjc-arc -O2 \
 # hardened runtime и отметкой времени, как для релиза. Ключ и сертификат
 # в скрипте не живут, они в связке ключей того, кто выпускает, или в
 # секретах раннера (см. docs/signing.md).
+#
+# Любое другое имя — локальный сертификат, самоподписанный в том числе. Им
+# подписывается так же, как ad-hoc, меняется только требование к подписи:
+# у ad-hoc это хеш бинарника, и TCC после каждой пересборки заново спрашивает
+# доступ к календарю, а у сертификата — он сам, и разрешение переживает сборки.
 IDENTITY="${CODESIGN_IDENTITY:--}"
+case "$IDENTITY" in
+    "Developer ID Application: "*) HARDENED=true ;;
+    *) HARDENED=false ;;
+esac
 if [ "$IDENTITY" = "-" ]; then
     echo "==> ad-hoc signing"
 else
@@ -108,9 +117,9 @@ xattr -cr "$APP"
 # бандл, про который codesign говорит «code object is not signed at all».
 # Заметить это можно было только по возвращающимся запросам TCC — то есть у
 # того, кто уже поставил приложение.
-if [ "$IDENTITY" = "-" ]; then
-    codesign --force --sign - "$APP/Contents/Resources/libcyclopmedia.dylib"
-    codesign --force --sign - "$APP"
+if [ "$HARDENED" = false ]; then
+    codesign --force --sign "$IDENTITY" "$APP/Contents/Resources/libcyclopmedia.dylib"
+    codesign --force --sign "$IDENTITY" "$APP"
 else
     codesign --force --timestamp --sign "$IDENTITY" \
         "$APP/Contents/Resources/libcyclopmedia.dylib"

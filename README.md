@@ -90,7 +90,7 @@ make install
 
 | Command | What it does |
 |---|---|
-| `make build` | `Scripts/bundle.sh`: swift build, assembles `build/Cyclop.app`, ad-hoc signs it |
+| `make build` | `Scripts/bundle.sh`: swift build, assembles `build/Cyclop.app`, signs it — ad-hoc, or with the certificate in `CODESIGN_IDENTITY` |
 | `make install` | `make build`, then quits the running Cyclop, replaces `/Applications/Cyclop.app` and launches it |
 | `make update` | `git pull --ff-only` on the current branch, then `make install`. Stops if the branch has diverged from its upstream |
 | `make test` | `Scripts/test.sh`: `swift test`, with Command Line Tools as well |
@@ -108,9 +108,37 @@ swift Scripts/make-icon.swift "$PWD/Resources/AppIcon.icns"
 The fork is installed with `make install` and updated with `make update`, see
 [Building](#building). The version is the first line of the menu bar menu.
 
-A build from source is ad-hoc signed and is not notarised. On the Mac that
-built it, it opens straight away; on any other Mac the first launch goes
-through **System Settings → Privacy & Security → "Open Anyway"**.
+A build from source is not notarised. On the Mac that built it, it opens
+straight away; on any other Mac the first launch goes through **System
+Settings → Privacy & Security → "Open Anyway"**.
+
+### Calendar access across updates
+
+By default the build is ad-hoc signed, and an ad-hoc signature is the hash of
+the binary. macOS ties the calendar permission to the signature, so after every
+`make update` that brings code changes Cyclop asks for full access again. A
+self-signed certificate keeps the signature the same from build to build.
+Set it up once:
+
+1. Keychain Access → Keychain Access menu → Certificate Assistant → Create a
+   Certificate…: name `Cyclop Local`, Identity Type "Self Signed Root",
+   Certificate Type "Code Signing". The default validity is a year; for longer,
+   tick "Let me override defaults" and set the period, e.g. 3650 days. A new
+   certificate is a new signature, and the permission will be asked once more.
+2. Add to `~/.zshrc`:
+   ```bash
+   export CODESIGN_IDENTITY="Cyclop Local"
+   ```
+3. `make install`. The first time, macOS asks whether codesign may use the
+   key — "Always Allow"; the calendar is asked one last time.
+
+Check: `codesign -d -r- /Applications/Cyclop.app` should print `certificate`
+instead of `cdhash`. If codesign says the certificate is not trusted, open it in
+Keychain Access → Trust → Code Signing: "Always Trust".
+
+Such a build is signed the same way as an ad-hoc one, only with the certificate:
+no hardened runtime and no timestamp — those are kept for Developer ID
+(`Scripts/bundle.sh`).
 
 Upstream images, `Cyclop-<version>.dmg` from the
 [upstream releases page](https://github.com/akalikbergenov/cyclop/releases), are

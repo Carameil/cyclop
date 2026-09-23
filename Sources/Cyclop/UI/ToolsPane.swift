@@ -13,6 +13,8 @@ struct ToolsPane: View {
     let dismiss: () -> Void
 
     @FocusState private var focused: Bool
+    @State private var copied = false
+    @State private var hoveringResult = false
 
     private let font: CGFloat = 12
 
@@ -72,12 +74,29 @@ struct ToolsPane: View {
     private var result: some View {
         column(kindTitle) {
             if !tools.output.isEmpty {
-                CopyButton { tools.copyOutput() }
+                CopyButton(copied: $copied) { tools.copyOutput() }
             }
         } content: {
             outcome
         }
         .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(canCopy && hoveringResult ? Theme.surfaceHover : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onHover { hoveringResult = $0 }
+        .onTapGesture { copyResult() }
+        .help(canCopy ? localized("Copy") : "")
+        .animation(Theme.contentAnimation, value: hoveringResult)
+    }
+
+    private var canCopy: Bool { tools.result.failure == nil && !tools.output.isEmpty }
+
+    private func copyResult() {
+        guard canCopy else { return }
+        tools.copyOutput()
+        flash($copied)
     }
 
     @ViewBuilder
@@ -93,7 +112,6 @@ struct ToolsPane: View {
                 Text(tools.output)
                     .font(.system(size: font, design: .monospaced))
                     .foregroundStyle(.white)
-                    .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

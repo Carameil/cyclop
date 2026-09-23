@@ -81,6 +81,9 @@ cd cyclop
 open build/Cyclop.app
 ```
 
+To update an installed build: `make update` pulls the current branch, rebuilds,
+replaces `/Applications/Cyclop.app` and relaunches it.
+
 The icon is generated in code, with no graphics editor involved:
 
 ```bash

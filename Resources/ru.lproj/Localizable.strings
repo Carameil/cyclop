@@ -20,6 +20,8 @@
 "Launch at Login" = "Запускать при входе";
 "Show Menu Bar Icon" = "Показывать иконку в меню-баре";
 "Show in Panel" = "Показывать в панели";
+"Tabs" = "Вкладки";
+"%d of %d" = "%d из %d";
 "Displays" = "Дисплеи";
 "Show on All Displays" = "Показывать на всех дисплеях";
 "Full-Height Notch Without a Cutout" = "Высокая чёлка на экранах без выреза";

@@ -22,13 +22,22 @@ func flash(_ flag: Binding<Bool>) {
 /// is why it is worth having in one place rather than four.
 struct CopyButton: View {
     let copy: () -> Void
+    private let external: Binding<Bool>?
 
-    @State private var copied = false
+    @State private var local = false
+
+    init(copied: Binding<Bool>? = nil, copy: @escaping () -> Void) {
+        self.external = copied
+        self.copy = copy
+    }
+
+    private var flag: Binding<Bool> { external ?? $local }
+    private var copied: Bool { flag.wrappedValue }
 
     var body: some View {
         Button {
             copy()
-            flash($copied)
+            flash(flag)
         } label: {
             Image(systemName: copied ? "checkmark" : "doc.on.doc")
                 .font(.system(size: 10, weight: .semibold))

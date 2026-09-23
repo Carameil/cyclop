@@ -20,6 +20,7 @@ struct SettingsPane: View {
     @State private var watchScreenshotFolder = false
     @State private var clearScreenshotsDaily = ConfigStore.shared.screenshotRetentionDays > 0
     @State private var screenshotUsage: (files: Int, bytes: Int64) = (0, 0)
+    @State private var tabsExpanded = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -51,12 +52,14 @@ struct SettingsPane: View {
                 // there only as long as whoever never uses it can take it off —
                 // and off means quiet too: its background stops with the icon.
                 section(localized("Show in Panel")) {
-                    ForEach(NotchViewModel.Tab.leftRail + NotchViewModel.Tab.rightRail) { tab in
-                        if tab.canHide {
+                    tabsDisclosureRow
+                    if tabsExpanded {
+                        ForEach(hideableTabs) { tab in
                             toggleRow(symbol: tab.symbol, title: tab.title, isOn: visibilityBinding(tab))
                         }
                     }
                 }
+                .animation(Theme.contentAnimation, value: tabsExpanded)
 
                 section(localized("Displays")) {
                     toggleRow(
@@ -151,6 +154,36 @@ struct SettingsPane: View {
             clearScreenshotsDaily = config.screenshotRetentionDays > 0
             refreshUsage()
         }
+    }
+
+    private var hideableTabs: [NotchViewModel.Tab] {
+        (NotchViewModel.Tab.leftRail + NotchViewModel.Tab.rightRail).filter(\.canHide)
+    }
+
+    private var tabsDisclosureRow: some View {
+        Button { tabsExpanded.toggle() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.secondary)
+                    .frame(width: 16)
+                Text(localized("Tabs"))
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 8)
+                Text(localized("%d of %d", hideableTabs.filter(vm.isVisible).count, hideableTabs.count))
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(Theme.tertiary)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Theme.secondary)
+                    .rotationEffect(.degrees(tabsExpanded ? 90 : 0))
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var hotkeyTitle: String {

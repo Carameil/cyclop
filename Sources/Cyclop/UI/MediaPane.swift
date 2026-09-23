@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MediaPane: View {
     @ObservedObject var media: MediaController
+    @StateObject private var volume = SystemVolume()
 
     @State private var scrubHover = false
     /// Set while dragging, so the bar follows the finger instead of the clock.
@@ -37,6 +38,8 @@ struct MediaPane: View {
             // Title and artist arrive together, so the whole column can cross-
             // fade as one unit when the track changes.
             .animation(Theme.artworkAnimation, value: track.key)
+            .onAppear { volume.start() }
+            .onDisappear { volume.stop() }
         } else {
             emptyState
         }
@@ -182,6 +185,11 @@ struct MediaPane: View {
                 .opacity(media.canSkip ? 1 : 0.35)
         }
         .frame(maxWidth: .infinity)
+        .overlay(alignment: .trailing) {
+            if let level = volume.level {
+                VolumeSlider(level: level) { volume.set($0) }
+            }
+        }
         .animation(.easeInOut(duration: 0.15), value: media.canSkip)
     }
 
@@ -197,5 +205,58 @@ struct MediaPane: View {
                 .foregroundStyle(Theme.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct VolumeSlider: View {
+    let level: Float
+    let set: (Float) -> Void
+
+    @State private var hover = false
+
+    private let width: CGFloat = 64
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.tertiary)
+                .frame(width: 14)
+
+            let height: CGFloat = hover ? 6 : 4
+            let filled = width * CGFloat(level)
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.surface).frame(height: height)
+                Capsule()
+                    .fill(Color.white.opacity(0.9))
+                    .frame(width: filled, height: height)
+                if hover {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 11, height: 11)
+                        .offset(x: min(max(filled - 5.5, 0), width - 11))
+                        .shadow(color: .black.opacity(0.4), radius: 3)
+                }
+            }
+            .frame(width: width, height: 14)
+            .contentShape(Rectangle())
+            .onHover { hover = $0 }
+            .gesture(
+                DragGesture(minimumDistance: 0).onChanged { value in
+                    set(Float(min(max(value.location.x / width, 0), 1)))
+                }
+            )
+            .animation(Theme.contentAnimation, value: hover)
+        }
+        .help(localized("Volume"))
+    }
+
+    private var symbol: String {
+        switch level {
+        case 0: return "speaker.slash.fill"
+        case ..<0.34: return "speaker.wave.1.fill"
+        case ..<0.67: return "speaker.wave.2.fill"
+        default: return "speaker.wave.3.fill"
+        }
     }
 }

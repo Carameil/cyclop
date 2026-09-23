@@ -16,6 +16,7 @@ struct CalendarPane: View {
     /// menu closes on the click that answers it — a view in the tab itself
     /// does not have that problem.
     @State private var showingCalendars = false
+    @State private var selectedDay = Foundation.Calendar.current.startOfDay(for: Date())
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -28,8 +29,8 @@ struct CalendarPane: View {
                 case .granted:
                     if showingCalendars {
                         calendarsList
-                    } else if let next = calendar.next {
-                        agenda(next: next)
+                    } else if !calendar.meetings.isEmpty {
+                        agenda
                     } else {
                         emptyState
                     }
@@ -106,94 +107,96 @@ struct CalendarPane: View {
 
     // MARK: - Agenda
 
-    private func agenda(next: CalendarStore.Meeting) -> some View {
+    private var agenda: some View {
         HStack(alignment: .top, spacing: 18) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 7) {
-                    Circle()
-                        .fill(Color(next.calendarColor))
-                        .frame(width: 7, height: 7)
-                    SpoilerText(
-                        text: next.title,
-                        hidden: hidden,
-                        font: .system(size: 16, weight: .semibold),
-                        height: 18,
-                        seed: UInt64(bitPattern: Int64(next.id.hashValue))
-                    )
-                    if privacy.covers(.calendar) {
-                        RevealEye(hidden: hidden) { privacy.toggle("calendar") }
-                    }
-                }
-                Text(subtitle(for: next))
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.secondary)
-                    .lineLimit(1)
-                    .padding(.top, 4)
-                    .padding(.leading, 14)
-
-                Spacer(minLength: 10)
-
-                if next.link != nil {
-                    Button {
-                        calendar.join(next)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "video.fill").font(.system(size: 10))
-                            Text(next.provider.map { localized("Join · %@", $0) } ?? localized("Join"))
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(
-                            Capsule().fill(next.isRunning ? Color.white.opacity(0.92) : Theme.surfaceHover)
-                        )
-                        .foregroundStyle(next.isRunning ? .black : .white)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.leading, 14)
+            Group {
+                if let next = calendar.next {
+                    hero(next: next)
+                } else {
+                    Text("No more meetings")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            rest
+            dayColumn
         }
         .padding(.top, 4)
     }
 
-    /// Everything after the next meeting, as a column on the right. A meeting
-    /// that overlaps `next` in time gets its own Join button — otherwise the
-    /// only way in is switching to Calendar, and the whole point of an
-    /// overlap is that two meetings are joinable right now, not just one.
-    private var rest: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            ForEach(calendar.upcoming.prefix(4)) { meeting in
-                HStack(spacing: 7) {
-                    Circle()
-                        .fill(Color(meeting.calendarColor))
-                        .frame(width: 5, height: 5)
-                    Text(Self.clock.string(from: meeting.start))
-                        .font(.system(size: 10, weight: .medium).monospacedDigit())
-                        .foregroundStyle(Theme.secondary)
-                        .frame(width: 34, alignment: .leading)
-                        .opacity(Foundation.Calendar.current.isDateInToday(meeting.start) ? 1 : 0.6)
-                    SpoilerText(
-                        text: meeting.title,
-                        hidden: hidden,
-                        font: .system(size: 10.5),
-                        color: Theme.tertiary,
-                        height: 11,
-                        seed: UInt64(bitPattern: Int64(meeting.id.hashValue))
-                    )
-                    if meeting.link != nil, let next = calendar.next, meeting.overlaps(next) {
-                        Spacer(minLength: 4)
-                        joinButton(for: meeting)
-                    }
+    private func hero(next: CalendarStore.Meeting) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(Color(next.calendarColor))
+                    .frame(width: 7, height: 7)
+                SpoilerText(
+                    text: next.title,
+                    hidden: hidden,
+                    font: .system(size: 16, weight: .semibold),
+                    height: 18,
+                    seed: UInt64(bitPattern: Int64(next.id.hashValue))
+                )
+                if privacy.covers(.calendar) {
+                    RevealEye(hidden: hidden) { privacy.toggle("calendar") }
                 }
             }
-            if calendar.upcoming.isEmpty {
-                Text("No other meetings this week")
+            Text(subtitle(for: next))
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.secondary)
+                .lineLimit(1)
+                .padding(.top, 4)
+                .padding(.leading, 14)
+
+            Spacer(minLength: 10)
+
+            if next.link != nil {
+                Button {
+                    calendar.join(next)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "video.fill").font(.system(size: 10))
+                        Text(next.provider.map { localized("Join · %@", $0) } ?? localized("Join"))
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule().fill(next.isRunning ? Color.white.opacity(0.92) : Theme.surfaceHover)
+                    )
+                    .foregroundStyle(next.isRunning ? .black : .white)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 14)
+            }
+        }
+    }
+
+    private var days: [Date] {
+        Agenda.days(from: calendar.now, count: CalendarStore.horizonDays)
+    }
+
+    private var shownDay: Date {
+        min(max(selectedDay, days[0]), days[days.count - 1])
+    }
+
+    private var dayColumn: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            dayNavigator
+            let meetings = Agenda.meetings(calendar.meetings, on: shownDay)
+            if meetings.isEmpty {
+                Text("No meetings")
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.tertiary)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        ForEach(meetings) { meeting in
+                            row(for: meeting)
+                        }
+                    }
+                }
             }
             Spacer(minLength: 0)
         }
@@ -201,6 +204,72 @@ struct CalendarPane: View {
         // Clears the gear button sitting at the pane's own top-trailing
         // corner (#36) — without this, its first row ran straight under it.
         .padding(.trailing, 26)
+    }
+
+    private var dayNavigator: some View {
+        let index = days.firstIndex(of: shownDay) ?? 0
+        return HStack(spacing: 6) {
+            stepButton("chevron.left", help: localized("Previous day"), disabled: index == 0) {
+                selectedDay = days[index - 1]
+            }
+            Text(Self.dayTitle(for: shownDay))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.secondary)
+                .frame(minWidth: 90)
+            stepButton("chevron.right", help: localized("Next day"), disabled: index == days.count - 1) {
+                selectedDay = days[index + 1]
+            }
+        }
+        .frame(height: 22)
+    }
+
+    private func stepButton(
+        _ symbol: String,
+        help: String,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(Theme.secondary)
+                .frame(width: 18, height: 18)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.3 : 1)
+        .help(help)
+    }
+
+    /// A meeting that overlaps `next` in time gets its own Join button —
+    /// otherwise the only way in is switching to Calendar, and the whole point
+    /// of an overlap is that two meetings are joinable right now, not just one.
+    private func row(for meeting: CalendarStore.Meeting) -> some View {
+        let next = calendar.next
+        let isNext = meeting.id == next?.id
+        return HStack(spacing: 7) {
+            Circle()
+                .fill(Color(meeting.calendarColor))
+                .frame(width: 5, height: 5)
+            Text(Self.clock.string(from: meeting.start))
+                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .foregroundStyle(Theme.secondary)
+                .frame(width: 34, alignment: .leading)
+            SpoilerText(
+                text: meeting.title,
+                hidden: hidden,
+                font: .system(size: 10.5, weight: isNext ? .semibold : .regular),
+                color: isNext ? Theme.secondary : Theme.tertiary,
+                height: 11,
+                seed: UInt64(bitPattern: Int64(meeting.id.hashValue))
+            )
+            if meeting.link != nil, !isNext, let next, meeting.overlaps(next) {
+                Spacer(minLength: 4)
+                joinButton(for: meeting)
+            }
+        }
+        .opacity(meeting.end <= calendar.now ? 0.4 : 1)
     }
 
     /// An icon rather than the label the main button spells out: the row has
@@ -239,6 +308,20 @@ struct CalendarPane: View {
         formatter.dateFormat = "EEEE, d MMMM"
         return formatter
     }()
+
+    private static let shortDay: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: appLanguage)
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM")
+        return formatter
+    }()
+
+    static func dayTitle(for date: Date) -> String {
+        let calendar = Foundation.Calendar.current
+        if calendar.isDateInToday(date) { return localized("Today") }
+        if calendar.isDateInTomorrow(date) { return localized("tomorrow").sentenceCased }
+        return shortDay.string(from: date).sentenceCased
+    }
 
     /// Nothing for today — the time alone says it. A word for tomorrow, a full
     /// date for anything further out.

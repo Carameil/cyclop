@@ -49,21 +49,17 @@ final class CalendarStore: ObservableObject {
     private var timer: Timer?
     private var observer: Any?
     /// Whether the panel is open. The half-minute tick serves eyes only — it
-    /// keeps the countdown honest and drops meetings as they end — so it runs
+    /// keeps the countdown honest and rolls the week over at midnight — so it runs
     /// exactly while there are eyes.
     private var isActive = false
     /// A day-long horizon leaves the tab empty every evening, which is exactly
     /// when one wonders what tomorrow looks like. A week is still glanceable
     /// because only the next meeting gets the large treatment.
-    private let horizon: TimeInterval = 7 * 24 * 3600
+    static let horizonDays = 7
+    private var loadedDay: Date?
 
     var next: Meeting? {
         meetings.first { $0.end > Date() }
-    }
-
-    var upcoming: [Meeting] {
-        guard let next else { return [] }
-        return meetings.filter { $0.id != next.id && $0.end > Date() }
     }
 
     // MARK: - Lifecycle
@@ -184,10 +180,7 @@ final class CalendarStore: ObservableObject {
 
     private func tick() {
         now = Date()
-        // Drop finished meetings without a full refetch.
-        if meetings.contains(where: { $0.end <= now }) {
-            meetings.removeAll { $0.end <= now }
-        }
+        if loadedDay != Foundation.Calendar.current.startOfDay(for: now) { reload() }
     }
 
     // MARK: - Loading
@@ -206,10 +199,11 @@ final class CalendarStore: ObservableObject {
             now = Date()
             return
         }
-        let start = Date()
+        let days = Agenda.days(from: Date(), count: Self.horizonDays + 1)
+        loadedDay = days[0]
         let predicate = store.predicateForEvents(
-            withStart: start,
-            end: start.addingTimeInterval(horizon),
+            withStart: days[0],
+            end: days[days.count - 1],
             calendars: calendars
         )
         meetings = store.events(matching: predicate)
@@ -218,7 +212,7 @@ final class CalendarStore: ObservableObject {
             .map { event in
                 let link = MeetingLink.find(in: event)
                 return Meeting(
-                    id: event.eventIdentifier ?? "\(event.startDate.timeIntervalSince1970)-\(event.title ?? "")",
+                    id: Agenda.meetingID(eventIdentifier: event.eventIdentifier, start: event.startDate, title: event.title),
                     title: event.title ?? localized("Untitled"),
                     start: event.startDate,
                     end: event.endDate,
@@ -265,6 +259,25 @@ final class CalendarStore: ObservableObject {
 
     func openCalendarApp() {
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+    }
+}
+
+enum Agenda {
+    static func meetingID(eventIdentifier: String?, start: Date, title: String?) -> String {
+        "\(eventIdentifier ?? title ?? "")@\(start.timeIntervalSince1970)"
+    }
+
+    static func meetings(
+        _ all: [CalendarStore.Meeting],
+        on day: Date,
+        calendar: Foundation.Calendar = .current
+    ) -> [CalendarStore.Meeting] {
+        all.filter { calendar.isDate($0.start, inSameDayAs: day) }
+    }
+
+    static func days(from now: Date, count: Int, calendar: Foundation.Calendar = .current) -> [Date] {
+        let today = calendar.startOfDay(for: now)
+        return (0..<count).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
     }
 }
 

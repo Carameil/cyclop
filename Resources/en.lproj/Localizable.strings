@@ -83,13 +83,16 @@
 /* Calendar */
 "Join" = "Join";
 "Join · %@" = "Join · %@";
-"No other meetings this week" = "No other meetings this week";
 "See your next meetings" = "See your next meetings";
 "Cyclop needs access to Calendar. It is the only permission\nthe app asks for, and only for this tab." = "Cyclop needs access to Calendar. It is the only permission\nthe app asks for, and only for this tab.";
 "Continue" = "Continue";
 "Calendar access is off" = "Calendar access is off";
 "Settings → Privacy → Calendars" = "Settings → Privacy → Calendars";
 "No more meetings" = "No more meetings";
+"Today" = "Today";
+"No meetings" = "No meetings";
+"Previous day" = "Previous day";
+"Next day" = "Next day";
 "Nothing on the calendar for the next day" = "Nothing on the calendar for the next day";
 "Untitled" = "Untitled";
 "Calendars" = "Calendars";

@@ -25,6 +25,9 @@ final class DebouncedWrite {
         self.delay = delay
     }
 
+    /// Whether a write is waiting — what is in memory is newer than the file.
+    var isPending: Bool { pending != nil }
+
     /// Replaces whatever was waiting. The newest closure wins, because it
     /// carries the newest state.
     func schedule(_ write: @escaping () -> Void) {

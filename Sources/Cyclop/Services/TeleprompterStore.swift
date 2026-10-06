@@ -55,13 +55,18 @@ final class TeleprompterStore: ObservableObject {
     /// Height of the window the text scrolls through, also from the pane.
     var viewportHeight: CGFloat = 0
 
-    private static let file = Support.file("teleprompter.txt")
+    static let defaultFile = Support.file("teleprompter.txt")
+
+    /// Given rather than looked up, as in `SnippetStore`: a test against the
+    /// real path would be rewriting the script of whoever ran it.
+    let file: URL
 
     private var timer: Timer?
     private let saves = DebouncedWrite()
 
-    init() {
-        script = (try? String(contentsOf: Self.file, encoding: .utf8)) ?? ""
+    init(file: URL = defaultFile) {
+        self.file = file
+        script = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
         // Reading the file above went through `script`'s observer and armed a
         // save of what was just loaded. Harmless, but worth not doing.
         saves.cancel()
@@ -134,18 +139,35 @@ final class TeleprompterStore: ObservableObject {
 
     func flush() { saves.flush() }
 
+    /// Re-read on every visit to the tab. The script is also written from
+    /// outside the app — a daily report dropped into the file by a script —
+    /// and without this it would show up only after a relaunch, and the copy
+    /// in memory would write over it at the next keystroke.
+    ///
+    /// An edit still waiting to be saved wins: it is newer than whatever is on
+    /// disk, and reloading would throw away what was just typed.
+    func reload() {
+        guard !saves.isPending,
+              let text = try? String(contentsOf: file, encoding: .utf8),
+              text != script else { return }
+        script = text
+        // Same as in `init`: loading went through `script`'s observer and
+        // armed a save of what was just read.
+        saves.cancel()
+    }
+
     private func persist() {
         do {
-            try script.write(to: Self.file, atomically: true, encoding: .utf8)
+            try script.write(to: file, atomically: true, encoding: .utf8)
         } catch {
             NSLog("Cyclop: cannot write teleprompter.txt: \(error.localizedDescription)")
         }
     }
 
     static func reveal() {
-        if !FileManager.default.fileExists(atPath: file.path) {
-            try? "".write(to: file, atomically: true, encoding: .utf8)
+        if !FileManager.default.fileExists(atPath: defaultFile.path) {
+            try? "".write(to: defaultFile, atomically: true, encoding: .utf8)
         }
-        NSWorkspace.shared.activateFileViewerSelecting([file])
+        NSWorkspace.shared.activateFileViewerSelecting([defaultFile])
     }
 }

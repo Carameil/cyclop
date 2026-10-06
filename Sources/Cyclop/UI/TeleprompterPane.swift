@@ -37,6 +37,7 @@ struct TeleprompterPane: View {
         // the one thing that must not happen then is opening onto the blank
         // space past the last line with no way to tell why it is blank.
         .onAppear {
+            prompter.reload()
             prompter.rewind()
             // An empty script has nothing to read, so the tab opens into the
             // editor — and an editor the keyboard never reaches is a field

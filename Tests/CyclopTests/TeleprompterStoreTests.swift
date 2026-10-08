@@ -54,4 +54,13 @@ struct TeleprompterStoreTests {
         store.reload()
         #expect(store.script == "вчера")
     }
+
+    /// `**…**` становится жирным, а нумерация и переносы строк остаются как
+    /// написаны: блочный markdown склеил бы пункты списка в один абзац.
+    @Test func formatBoldsInlineMarkdownAndKeepsTheLayout() {
+        let formatted = TeleprompterStore.format("1. **Lokii** — починил\n\n2. ревью")
+        #expect(String(formatted.characters) == "1. Lokii — починил\n\n2. ревью")
+        let bold = formatted.runs.filter { $0.inlinePresentationIntent == .stronglyEmphasized }
+        #expect(bold.map { String(formatted[$0.range].characters) } == ["Lokii"])
+    }
 }

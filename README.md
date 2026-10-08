@@ -23,6 +23,7 @@ with a few additions for everyday backend work. Everything upstream is kept as i
 | **Screenshot retention** | Settings → "Keep Only Today's Screenshots": everything older goes to the Trash at launch and at midnight. Off by default, as upstream. `screenshotRetentionDays` in `config.json` for any other window. The shelf also gets a "Trash Screenshots" button |
 | **Volume** | A system volume slider next to the player controls on the Music tab. It drives the default output device and is not shown when that device's volume cannot be set |
 | **Calendar by day** | The meeting list shows one day at a time: today first, arrows step through the week. Each occurrence of a recurring meeting is its own row |
+| **Teleprompter** | Opens as a page of text in the 15 pt editor font, so a long list of notes fits on screen; ▶ switches to the large scrolling text, ↺ back. `**bold**` is shown bold. `teleprompter.txt` is re-read each time the tab is shown, so a script written there from outside appears without a relaunch |
 | **Settings** | The per-tab switches in "Show in Panel" fold into a single "Tabs" row with an "N of M" counter |
 | **Deploy with make** | `make install` builds the app and puts it into `/Applications`, `make update` pulls first — [Building](#building) |
 

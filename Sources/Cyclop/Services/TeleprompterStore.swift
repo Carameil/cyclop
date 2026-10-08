@@ -13,12 +13,19 @@ final class TeleprompterStore: ObservableObject {
     @Published var script: String = "" {
         didSet {
             guard script != oldValue else { return }
+            formatted = Self.format(script)
             // Rewriting the script mid-take would leave the scroll pointing at
             // a line that no longer exists.
             offset = 0
             scheduleSave()
         }
     }
+
+    /// The script as shown: inline markdown applied, so `**task**` reads bold
+    /// and a long list can be scanned by its headings. Parsed here, once per
+    /// change, rather than in the view, which redraws sixty times a second
+    /// while the text is moving.
+    private(set) var formatted = AttributedString()
 
     /// Points per second the text creeps upward at 1×. Slow: a comfortable
     /// reading pace is far slower than anyone guesses before trying it, and
@@ -123,9 +130,20 @@ final class TeleprompterStore: ObservableObject {
     }
 
     private func tick() {
-        guard isRunning else { return }
+        // Nothing measured yet: the scrolling view is put on screen by the
+        // same press that started the clock, and until it is laid out the end
+        // of the script would look like it is at the very top.
+        guard isRunning, contentHeight > 0 else { return }
         offset = min(maxOffset, offset + Self.baseRate * CGFloat(speed) / 60.0)
         if offset >= maxOffset { pause() }
+    }
+
+    /// Inline markdown only, whitespace kept: line breaks and numbering are
+    /// the layout of a script, and block parsing would fold them away. Text
+    /// that is not valid markdown is shown as written.
+    static func format(_ script: String) -> AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        return (try? AttributedString(markdown: script, options: options)) ?? AttributedString(script)
     }
 
     // MARK: - Storage

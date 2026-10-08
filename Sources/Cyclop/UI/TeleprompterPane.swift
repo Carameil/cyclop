@@ -2,22 +2,29 @@ import SwiftUI
 
 /// The script, scrolling under the camera.
 ///
-/// Two states rather than two tabs: the script is pasted in once and read many
-/// times, so reading is what the tab opens onto and editing is a step aside.
+/// Three states rather than three tabs. The tab opens onto the page: the whole
+/// script at a size meant for glancing at during a call, which is what a list
+/// of notes is mostly used for. ▶ turns it into the teleprompter proper — large
+/// type creeping upward — and ↺ turns it back. Editing is a step aside from
+/// either.
 struct TeleprompterPane: View {
     @ObservedObject var prompter: TeleprompterStore
     /// Whether the panel holds the keyboard, so the editor can follow it.
     @Binding var wantsKeyboard: Bool
 
     @State private var editing = false
+    /// Whether the large scrolling text is up instead of the page.
+    @State private var prompting = false
     @FocusState private var focused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             if editing || prompter.script.isEmpty {
                 editor
-            } else {
+            } else if prompting {
                 reader
+            } else {
+                page
             }
             controls
         }
@@ -68,6 +75,26 @@ struct TeleprompterPane: View {
         .onDisappear { prompter.suspend() }
     }
 
+    // MARK: - Page
+
+    /// The script laid out like the editor, minus the caret: same box, same
+    /// column, a size that fits a whole stand-up on screen. Scrolled by hand,
+    /// because nothing here moves by itself.
+    private var page: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            Text(prompter.formatted)
+                .font(.system(size: 15, design: .rounded))
+                .foregroundStyle(.white)
+                .lineSpacing(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, EditorInset.horizontal + 5)
+                .padding(.vertical, EditorInset.vertical)
+        }
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.horizontal, 14)
+    }
+
     // MARK: - Reading
 
     /// The line being read sits in the middle of the window, not at the top:
@@ -76,7 +103,7 @@ struct TeleprompterPane: View {
     private var reader: some View {
         GeometryReader { outer in
             ScrollView(.vertical, showsIndicators: false) {
-                Text(prompter.script)
+                Text(prompter.formatted)
                     .font(.system(size: prompter.fontSize, weight: .medium, design: .rounded))
                     .foregroundStyle(.white)
                     .lineSpacing(prompter.fontSize * 0.34)
@@ -105,6 +132,9 @@ struct TeleprompterPane: View {
             .overlay(alignment: .bottom) { fade(.bottom) }
             .onAppear { prompter.viewportHeight = outer.size.height }
             .onChange(of: outer.size.height) { _, height in prompter.viewportHeight = height }
+            // Measured afresh every time it comes up: a height left over from
+            // an earlier script would end the next take early.
+            .onDisappear { prompter.contentHeight = 0 }
         }
     }
 
@@ -189,12 +219,20 @@ struct TeleprompterPane: View {
                 .foregroundStyle(prompter.script.isEmpty ? Theme.tertiary : .white)
                 .disabled(prompter.script.isEmpty)
             } else {
-                Button { prompter.rewind() } label: {
-                    Image(systemName: "arrow.counterclockwise")
+                if prompting {
+                    Button {
+                        prompter.rewind()
+                        prompting = false
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                    }
+                    .buttonStyle(NotchButtonStyle(size: 26))
                 }
-                .buttonStyle(NotchButtonStyle(size: 26))
 
-                Button { prompter.toggle() } label: {
+                Button {
+                    prompting = true
+                    prompter.toggle()
+                } label: {
                     Image(systemName: prompter.isRunning ? "pause.fill" : "play.fill")
                 }
                 .buttonStyle(NotchButtonStyle(size: 32, prominent: true))
@@ -203,10 +241,11 @@ struct TeleprompterPane: View {
 
                 Spacer()
 
-                sizeControl
+                if prompting { sizeControl }
 
                 Button {
                     prompter.pause()
+                    prompting = false
                     editing = true
                     wantsKeyboard = true
                 } label: {

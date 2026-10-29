@@ -40,10 +40,31 @@ struct NotchGeometry {
     var tallExpandedSize: CGSize {
         CGSize(width: expandedSize.width, height: Self.tallBodyHeight)
     }
-    /// Tallest body any tab can ask for. The window is cut to this once and
-    /// never resized: it is transparent outside the visible panel, and what is
+    /// Tallest body any tab asks for by itself. The window is cut to this, or
+    /// to the size the panel was dragged out to by its corners if that is
+    /// bigger: it is transparent outside the visible panel, and what is
     /// clickable is decided separately by the active rect.
     var maxBodyHeight: CGFloat { max(expandedSize.height, Self.tallBodyHeight) }
+
+    /// Largest body this screen holds: the window still fits sideways,
+    /// shoulders and shadow included, and the bottom slack still fits under it.
+    var maxBody: CGSize {
+        let room = min(notchCenterX - screen.frame.minX, screen.frame.maxX - notchCenterX)
+        return CGSize(
+            width: max(tallExpandedSize.width, 2 * room - windowPadding.left - windowPadding.right),
+            height: max(tallExpandedSize.height, screen.frame.height - windowPadding.bottom)
+        )
+    }
+
+    /// A tab's own body stretched to the size the panel was dragged out to:
+    /// never smaller than the tab asks for, never bigger than this screen holds.
+    func body(_ base: CGSize, stretchedTo requested: CGSize) -> CGSize {
+        let upper = maxBody
+        return CGSize(
+            width: min(max(requested.width, base.width), upper.width),
+            height: min(max(requested.height, base.height), upper.height)
+        )
+    }
 
     /// What the body has left for content on an ordinary tab, once the header
     /// and the padding beneath are taken out.
@@ -177,20 +198,24 @@ struct NotchGeometry {
 
     // MARK: - Derived frames
 
-    var windowSize: CGSize {
+    /// Window big enough for every ordinary body and for `body` as well.
+    func windowSize(fitting body: CGSize) -> CGSize {
         CGSize(
-            width: expandedSize.width + windowPadding.left + windowPadding.right,
-            height: maxBodyHeight + windowPadding.bottom
+            width: max(expandedSize.width, body.width) + windowPadding.left + windowPadding.right,
+            height: max(maxBodyHeight, body.height) + windowPadding.bottom
         )
     }
 
-    /// Panel frame in global screen coordinates, flush with the top of the display.
-    var windowFrame: CGRect {
-        CGRect(
-            x: notchCenterX - windowSize.width / 2,
-            y: screen.frame.maxY - windowSize.height,
-            width: windowSize.width,
-            height: windowSize.height
+    /// Panel frame in global screen coordinates, flush with the top of the
+    /// display and centred on the notch — so a body that grows, grows evenly
+    /// to both sides.
+    func windowFrame(fitting body: CGSize) -> CGRect {
+        let size = windowSize(fitting: body)
+        return CGRect(
+            x: notchCenterX - size.width / 2,
+            y: screen.frame.maxY - size.height,
+            width: size.width,
+            height: size.height
         )
     }
 
@@ -203,16 +228,23 @@ struct NotchGeometry {
         return CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height + 2)
     }
 
-    /// Rect the content occupies inside the window, in screen coordinates.
+    /// Rect the content occupies, in screen coordinates. Whatever the window's
+    /// size, it is centred on the notch and hangs from the top edge.
     func contentScreenRect(for size: CGSize) -> CGRect {
-        includingTopEdge(contentRect(for: size).offsetBy(dx: windowFrame.minX, dy: windowFrame.minY))
+        includingTopEdge(CGRect(
+            x: notchCenterX - size.width / 2,
+            y: screen.frame.maxY - size.height,
+            width: size.width,
+            height: size.height
+        ))
     }
 
-    /// Rect the content occupies inside the window, in AppKit window coordinates.
-    func contentRect(for size: CGSize) -> CGRect {
+    /// Rect the content occupies inside a window of `window` size, in AppKit
+    /// window coordinates.
+    func contentRect(for size: CGSize, in window: CGSize) -> CGRect {
         CGRect(
-            x: (windowSize.width - size.width) / 2,
-            y: windowSize.height - size.height,
+            x: (window.width - size.width) / 2,
+            y: window.height - size.height,
             width: size.width,
             height: size.height
         )

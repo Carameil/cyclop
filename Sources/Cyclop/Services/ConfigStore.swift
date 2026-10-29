@@ -34,6 +34,8 @@ final class ConfigStore: ObservableObject {
         var fullSizeDrawnNotch = false
         var hotkey = "ctrl+alt+space"
         var screenshotRetentionDays = 0
+        var panelWidth: Double = 0
+        var panelHeight: Double = 0
 
         init() {}
 
@@ -53,6 +55,8 @@ final class ConfigStore: ObservableObject {
             fullSizeDrawnNotch = try c.decodeIfPresent(Bool.self, forKey: .fullSizeDrawnNotch) ?? d.fullSizeDrawnNotch
             hotkey = try c.decodeIfPresent(String.self, forKey: .hotkey) ?? d.hotkey
             screenshotRetentionDays = try c.decodeIfPresent(Int.self, forKey: .screenshotRetentionDays) ?? d.screenshotRetentionDays
+            panelWidth = try c.decodeIfPresent(Double.self, forKey: .panelWidth) ?? d.panelWidth
+            panelHeight = try c.decodeIfPresent(Double.self, forKey: .panelHeight) ?? d.panelHeight
         }
     }
 
@@ -126,6 +130,16 @@ final class ConfigStore: ObservableObject {
     var teleprompterFontSize: Double {
         get { value.teleprompter.fontSize }
         set { value.teleprompter.fontSize = newValue; persist() }
+    }
+
+    /// Size the panel was last dragged out to; zero until it has been.
+    var panelSize: CGSize {
+        get { CGSize(width: value.panelWidth, height: value.panelHeight) }
+        set {
+            value.panelWidth = newValue.width
+            value.panelHeight = newValue.height
+            persist()
+        }
     }
 
     /// Tabs switched off in Settings (#80), by `Tab.rawValue`. Kept as the set

@@ -1,4 +1,5 @@
-import Foundation
+import AppKit
+import SwiftUI
 import Testing
 @testable import Cyclop
 
@@ -62,5 +63,78 @@ struct TeleprompterStoreTests {
         #expect(String(formatted.characters) == "1. Lokii — починил\n\n2. ревью")
         let bold = formatted.runs.filter { $0.inlinePresentationIntent == .stronglyEmphasized }
         #expect(bold.map { String(formatted[$0.range].characters) } == ["Lokii"])
+    }
+
+    /// Таблица из ответа чата остаётся таблицей: шапка, строки, `<br>` внутри
+    /// ячейки — перенос, короткая строка дополняется до ширины шапки.
+    @Test func parseTurnsAPastedTableIntoATable() {
+        let blocks = TeleprompterBlock.parse("""
+        Вот решения:
+
+        | Результат | К чему | Как |
+        |---|:---:|---|
+        | Лендинг | Скриншот | `screenshot_url` |
+        | Категория | Вся<br>проверка |
+        """)
+        #expect(blocks.count == 2)
+        #expect(blocks.first == .text(TeleprompterStore.format("Вот решения:")))
+        guard case .table(let header, let rows) = blocks.last else {
+            Issue.record("no table in \(blocks)")
+            return
+        }
+        #expect(header.map { String($0.characters) } == ["Результат", "К чему", "Как"])
+        #expect(rows.map { $0.map { String($0.characters) } } == [
+            ["Лендинг", "Скриншот", "screenshot_url"],
+            ["Категория", "Вся\nпроверка", ""],
+        ])
+    }
+
+    /// Заголовки, картинка на своей строке, цитата, код и черта — отдельные
+    /// блоки; маркер списка становится точкой, переносы строк остаются.
+    @Test func parsePicksOutBlocksAndKeepsPlainLines() {
+        let blocks = TeleprompterBlock.parse("""
+        ## План
+        - первое
+        - второе
+        ![](teleprompter-images/shot.png)
+        > важно
+        ---
+        ```
+        let x = 1
+        ```
+        """)
+        #expect(blocks == [
+            .heading(level: 2, text: TeleprompterStore.format("План")),
+            .text(TeleprompterStore.format("• первое\n• второе")),
+            .image(source: "teleprompter-images/shot.png"),
+            .quote(TeleprompterStore.format("важно")),
+            .rule,
+            .code("let x = 1"),
+        ])
+    }
+
+    /// `**жирный**` в начале строки — не маркер списка, `#тег` — не заголовок.
+    @Test func parseLeavesLookalikesAsText() {
+        let blocks = TeleprompterBlock.parse("**Lokii** — починил\n#тег")
+        #expect(blocks == [.text(TeleprompterStore.format("**Lokii** — починил\n#тег"))])
+    }
+
+    /// Вставленный скриншот ложится рядом со скриптом, а в текст попадает
+    /// строкой `![](…)` там, где стоит каретка, и открывается по этому пути.
+    @Test func attachedImageIsInsertedAtTheCaretAndResolves() throws {
+        let (store, _) = try Self.makeStore(contents: "")
+        store.script = "до\nпосле"
+        let rep = try #require(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ))
+        let png = try #require(rep.representation(using: .png, properties: [:]))
+        let line = try #require(store.attachImage(png))
+        store.selection = TextSelection(insertionPoint: store.script.index(store.script.startIndex, offsetBy: 2))
+        store.insert(line)
+
+        #expect(store.script == "до\n\(line)\nпосле")
+        let source = String(line.dropFirst(4).dropLast())
+        #expect(store.image(source) != nil)
     }
 }

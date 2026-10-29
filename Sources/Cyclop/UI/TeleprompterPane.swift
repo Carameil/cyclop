@@ -82,11 +82,7 @@ struct TeleprompterPane: View {
     /// because nothing here moves by itself.
     private var page: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            Text(prompter.formatted)
-                .font(.system(size: 15, design: .rounded))
-                .foregroundStyle(.white)
-                .lineSpacing(4)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ScriptView(blocks: prompter.blocks, fontSize: 15, lineSpacing: 4, image: prompter.image)
                 .padding(.horizontal, EditorInset.horizontal + 5)
                 .padding(.vertical, EditorInset.vertical)
         }
@@ -103,12 +99,13 @@ struct TeleprompterPane: View {
     private var reader: some View {
         GeometryReader { outer in
             ScrollView(.vertical, showsIndicators: false) {
-                Text(prompter.formatted)
-                    .font(.system(size: prompter.fontSize, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineSpacing(prompter.fontSize * 0.34)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                ScriptView(
+                    blocks: prompter.blocks,
+                    fontSize: prompter.fontSize,
+                    weight: .medium,
+                    lineSpacing: prompter.fontSize * 0.34,
+                    image: prompter.image
+                )
                     .padding(.horizontal, 26)
                     // Half a window of blank above and below, so the first line
                     // starts at the reading mark and the last one can reach it.
@@ -172,8 +169,14 @@ struct TeleprompterPane: View {
         static let vertical: CGFloat = 10
     }
 
+    /// Into the store rather than `@State`: a screenshot pasted with ⌘V is
+    /// put in by the store, at the caret.
+    private var selection: Binding<TextSelection?> {
+        Binding(get: { prompter.selection }, set: { prompter.selection = $0 })
+    }
+
     private var editor: some View {
-        TextEditor(text: $prompter.script)
+        TextEditor(text: $prompter.script, selection: selection)
             .font(.system(size: 13, design: .rounded))
             .scrollContentBackground(.hidden)
             .foregroundStyle(.white)
@@ -193,7 +196,7 @@ struct TeleprompterPane: View {
                     // text container's own 5 pt of line fragment padding.
                     // Getting this wrong parks the caret above and left of the
                     // placeholder it is supposed to stand in front of.
-                    Text("Paste the script here")
+                    Text("Paste the script or a screenshot here")
                         .font(.system(size: 13, design: .rounded))
                         .foregroundStyle(Theme.tertiary)
                         .padding(.leading, 14 + EditorInset.horizontal + 5)

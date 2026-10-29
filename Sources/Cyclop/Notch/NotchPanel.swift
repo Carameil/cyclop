@@ -71,6 +71,9 @@ final class NotchPanel: NSPanel {
     /// be noticed is here, where every event the window receives passes.
     var onPress: (() -> Void)?
 
+    /// Asked before ⌘V reaches the text view; true means it was handled here.
+    var onPaste: (() -> Bool)?
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown, editingAction(for: event) != nil, perform(event) { return }
         // Before `super`, so the window is already key by the time the click
@@ -99,6 +102,7 @@ final class NotchPanel: NSPanel {
     /// app reports that as nil however key this panel actually is.
     private func perform(_ event: NSEvent) -> Bool {
         guard let action = editingAction(for: event), let responder = firstResponder else { return false }
+        if action == #selector(NSText.paste(_:)), onPaste?() == true { return true }
         return responder.tryToPerform(action, with: self)
     }
 

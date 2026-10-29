@@ -227,6 +227,29 @@ final class NotchViewModel: ObservableObject {
     /// script runs out, Escape, or a click anywhere outside the panel.
     var holdsOpen: Bool { tab == .teleprompter && teleprompter.isRunning }
 
+    /// Size the panel was dragged out to by its bottom corners — one for every
+    /// tab, so switching tabs never pulls the edge in from under the pointer.
+    /// Kept as asked; each screen holds it between the tab's own size and what
+    /// fits there (`NotchGeometry.body`). Zero until it has been dragged,
+    /// which every tab reads as its own size.
+    @Published private(set) var panelSize = ConfigStore.shared.panelSize
+    /// A corner is being dragged. The panel holds open and keeps taking the
+    /// pointer meanwhile — dragging past the edge of the screen is not
+    /// leaving the panel.
+    @Published private(set) var isResizing = false
+
+    func resize(to size: CGSize) {
+        isResizing = true
+        panelSize = size
+    }
+
+    /// Saved once, when the corner is let go, not at every step of the drag.
+    func endResize() {
+        guard isResizing else { return }
+        isResizing = false
+        ConfigStore.shared.panelSize = panelSize
+    }
+
     let media: MediaController
     let shelf: ShelfStore
     let clipboard: ClipboardStore

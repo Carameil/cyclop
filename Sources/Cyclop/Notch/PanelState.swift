@@ -49,9 +49,14 @@ final class PanelState: ObservableObject {
     /// One tab is taller than the rest. Type large enough to read at a glance
     /// leaves room for two lines in the standard body, and two lines is not a
     /// teleprompter — it is a countdown. The extra height buys the paragraph
-    /// the reader needs to see coming.
-    var openBodySize: CGSize {
-        vm.tab.isTall ? geometry.tallExpandedSize : geometry.expandedSize
+    /// the reader needs to see coming. Any tab is then stretched to the size
+    /// the panel was dragged out to by its bottom corners.
+    var openBodySize: CGSize { stretched(vm.panelSize) }
+
+    /// `requested`, held between what the current tab asks for and what this
+    /// screen holds.
+    func stretched(_ requested: CGSize) -> CGSize {
+        geometry.body(vm.tab.isTall ? geometry.tallExpandedSize : geometry.expandedSize, stretchedTo: requested)
     }
 
     /// Size of the visible body for the current state.

@@ -124,7 +124,7 @@ final class ClipboardStore: ObservableObject {
         }
 
         if wantsImages() {
-            if let png = pngFromPasteboard(pasteboard) {
+            if let png = Self.png(from: pasteboard) {
                 onImage?(png)
                 return
             }
@@ -169,7 +169,7 @@ final class ClipboardStore: ObservableObject {
                 guard let self else { return }
                 let pasteboard = NSPasteboard.general
                 guard pasteboard.changeCount == changeCount else { return }
-                if let png = self.pngFromPasteboard(pasteboard) {
+                if let png = Self.png(from: pasteboard) {
                     self.onImage?(png)
                     return
                 }
@@ -179,7 +179,7 @@ final class ClipboardStore: ObservableObject {
     }
 
     /// Screenshots land as PNG; other apps often offer only TIFF.
-    private func pngFromPasteboard(_ pasteboard: NSPasteboard) -> Data? {
+    static func png(from pasteboard: NSPasteboard) -> Data? {
         if let png = pasteboard.data(forType: .png) { return png }
         guard let tiff = pasteboard.data(forType: .tiff),
               let rep = NSBitmapImageRep(data: tiff) else { return nil }

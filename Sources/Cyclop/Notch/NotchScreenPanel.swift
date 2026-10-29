@@ -73,9 +73,8 @@ final class NotchScreenPanel {
         // Summoned only when the pointer is genuinely elsewhere. With the
         // pointer already on the panel the usual rule holds from the start,
         // and leaving closes it like any other hover.
-        let body = tab.isTall ? geometry.tallExpandedSize : geometry.expandedSize
-        isSummoned = !geometry.hoverRect(for: body).contains(NSEvent.mouseLocation)
         state.select(tab)
+        isSummoned = !geometry.hoverRect(for: state.openBodySize).contains(NSEvent.mouseLocation)
         setOpen(true)
         pointer.setInside(true)
         if tab.needsKeyboard { state.wantsKeyboard = true }
@@ -88,9 +87,22 @@ final class NotchScreenPanel {
         pointer.setInside(false)
     }
 
-    /// Same display, same notch, moved: keep the panel and everything on it.
-    func setFrame(_ frame: CGRect) {
-        panel?.setFrame(frame, display: false)
+    /// Cuts the window to the largest body it may have to show: the panel as
+    /// dragged out, or — while a corner is being dragged — the largest it may
+    /// become, so the drag never outruns the window.
+    func fitWindow() {
+        guard let panel else { return }
+        let frame = geometry.windowFrame(fitting: windowBody)
+        guard panel.frame != frame else { return }
+        panel.setFrame(frame, display: true)
+        // The body has not moved on screen, but the window has under it.
+        applyActiveRect(open: state.isOpen)
+    }
+
+    private var windowBody: CGSize {
+        vm.isResizing
+            ? geometry.maxBody
+            : geometry.body(geometry.tallExpandedSize, stretchedTo: vm.panelSize)
     }
 
     /// The panel belongs to the desktop it was opened on. ⌘-Tab to another one
@@ -121,8 +133,9 @@ final class NotchScreenPanel {
     // MARK: - Construction
 
     private func build() {
-        let panel = NotchPanel(contentRect: geometry.windowFrame)
-        let root = NotchRootView(frame: CGRect(origin: .zero, size: geometry.windowSize))
+        let frame = geometry.windowFrame(fitting: windowBody)
+        let panel = NotchPanel(contentRect: frame)
+        let root = NotchRootView(frame: CGRect(origin: .zero, size: frame.size))
         root.autoresizingMask = [.width, .height]
 
         let hosting = NSHostingView(rootView: NotchContentView(vm: vm, panel: state))
@@ -166,9 +179,17 @@ final class NotchScreenPanel {
 
         state.onDismiss = { [weak self] in self?.dismiss() }
 
+        // Rich text and screenshots pasted into the script. Only the
+        // teleprompter's editor takes them; everywhere else ⌘V goes to the
+        // text view as before.
+        panel.onPaste = { [weak self] in
+            guard let self, vm.tab == .teleprompter else { return false }
+            return vm.teleprompter.paste()
+        }
+
         panel.contentView = root
         panel.ignoresMouseEvents = true
-        panel.setFrame(geometry.windowFrame, display: false)
+        panel.setFrame(frame, display: false)
         panel.orderFrontRegardless()
 
         self.panel = panel
@@ -188,7 +209,11 @@ final class NotchScreenPanel {
         // crossing them is usually on its way to one of them. There, staying
         // put is what asks for the panel.
         pointer.openDelay = geometry.isPhysical ? 0.05 : 0.2
-        pointer.isDragging = { [weak root] in root?.isReceivingDrag ?? false }
+        // A corner being dragged is a drag too: the pointer may run past the
+        // panel's edge, and the panel must keep taking it.
+        pointer.isDragging = { [weak root, weak self] in
+            root?.isReceivingDrag == true || self?.vm.isResizing == true
+        }
         pointer.isPanelOpen = { [weak state] in state?.isOpen ?? false }
         pointer.onChange = { [weak self] inside in
             guard let self else { return }
@@ -196,7 +221,7 @@ final class NotchScreenPanel {
             // Guarded here rather than inside `setOpen` so that the reasons
             // that are not the pointer, like the screen going to sleep, still
             // close a running teleprompter.
-            if !inside, holdsOpen || isSummoned { return }
+            if !inside, holdsOpen || isSummoned || vm.isResizing { return }
             // The pointer has arrived; from here on it decides as usual.
             if inside { isSummoned = false }
             setOpen(inside)
@@ -224,6 +249,28 @@ final class NotchScreenPanel {
                     // A pass later: `openBodySize` reads `tab`, and this fires
                     // while the property is still being set.
                     DispatchQueue.main.async { self.refreshOpenRects() }
+                }
+            }
+            .store(in: &cancellables)
+
+        // Dragging a corner reshapes the body; the rects follow a pass later,
+        // once the new size is stored.
+        vm.$panelSize
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
+                    DispatchQueue.main.async { self?.refreshOpenRects() }
+                }
+            }
+            .store(in: &cancellables)
+
+        vm.$isResizing
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
+                    DispatchQueue.main.async { self?.fitWindow() }
                 }
             }
             .store(in: &cancellables)
@@ -389,7 +436,7 @@ final class NotchScreenPanel {
         // is taller, and a rect cut for 208 would leave the bottom half of it
         // visible but untouchable.
         let size = open ? state.openBodySize : geometry.collapsedSize
-        var rect = geometry.contentRect(for: size)
+        var rect = geometry.contentRect(for: size, in: rootView.bounds.size)
         if open {
             // Slack so the concave shoulders stay grabbable. Never while
             // collapsed: that would swallow clicks on menu bar items next to

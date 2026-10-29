@@ -90,7 +90,7 @@ final class NotchController {
             guard let id = geometry.displayID else { continue }
             let existing = panels.removeValue(forKey: id)
             if let existing, existing.geometry.matches(geometry) {
-                existing.setFrame(geometry.windowFrame)
+                existing.fitWindow()
                 next[id] = existing
             } else {
                 existing?.teardown()

@@ -60,6 +60,16 @@ struct NotchContentView: View {
             }
             .frame(width: size.width, height: size.height, alignment: .top)
             .clipped()
+            .overlay(alignment: .bottom) {
+                if isOpen {
+                    HStack(spacing: 0) {
+                        ResizeGrip(edge: .leading, vm: vm, panel: panel)
+                        Spacer(minLength: 0)
+                        ResizeGrip(edge: .trailing, vm: vm, panel: panel)
+                    }
+                    .transition(.opacity)
+                }
+            }
         }
         .frame(width: size.width + 2 * topRadius, height: size.height, alignment: .top)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -239,6 +249,53 @@ private struct CurrencyRateDate: View {
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
                 .foregroundStyle(Theme.tertiary)
         }
+    }
+}
+
+/// A bottom corner of the panel, dragged to make the body bigger on every tab.
+///
+/// The body grows evenly to both sides, since the panel stays centred on the
+/// notch: a corner moved out by some distance widens the body by twice that,
+/// and the corner stays under the pointer. Measured in screen points from
+/// `NSEvent` rather than from the gesture, because the window is resized under
+/// the gesture the moment the drag starts.
+private struct ResizeGrip: View {
+    let edge: HorizontalEdge
+    let vm: NotchViewModel
+    let panel: PanelState
+
+    @State private var start: (mouse: CGPoint, size: CGSize)?
+    @State private var hovered = false
+
+    var body: some View {
+        Path { path in
+            // Small enough to stay clear of the rail's last icon above it.
+            let x: (CGFloat) -> CGFloat = { edge == .leading ? $0 : 20 - $0 }
+            path.move(to: CGPoint(x: x(5), y: 5))
+            path.addQuadCurve(to: CGPoint(x: x(15), y: 15), control: CGPoint(x: x(5), y: 15))
+        }
+        .stroke(hovered ? Theme.secondary : Theme.tertiary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        .frame(width: 20, height: 20)
+        .contentShape(Rectangle())
+        .onHover { hovered = $0 }
+        .gesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { _ in
+                    let mouse = NSEvent.mouseLocation
+                    let origin = start ?? (mouse, panel.openBodySize)
+                    start = origin
+                    let dx = (mouse.x - origin.mouse.x) * (edge == .trailing ? 1 : -1)
+                    let dy = origin.mouse.y - mouse.y
+                    vm.resize(to: panel.stretched(CGSize(
+                        width: origin.size.width + 2 * dx,
+                        height: origin.size.height + dy
+                    )))
+                }
+                .onEnded { _ in
+                    start = nil
+                    vm.endResize()
+                }
+        )
     }
 }
 

@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 /// The script, and where reading it has got to.
 ///
@@ -13,7 +14,7 @@ final class TeleprompterStore: ObservableObject {
     @Published var script: String = "" {
         didSet {
             guard script != oldValue else { return }
-            formatted = Self.format(script)
+            blocks = TeleprompterBlock.parse(script)
             // Rewriting the script mid-take would leave the scroll pointing at
             // a line that no longer exists.
             offset = 0
@@ -21,11 +22,16 @@ final class TeleprompterStore: ObservableObject {
         }
     }
 
-    /// The script as shown: inline markdown applied, so `**task**` reads bold
-    /// and a long list can be scanned by its headings. Parsed here, once per
-    /// change, rather than in the view, which redraws sixty times a second
-    /// while the text is moving.
-    private(set) var formatted = AttributedString()
+    /// The script as shown: markdown applied, so `**task**` reads bold, a
+    /// table pasted from a chat answer stays a table and a screenshot is shown
+    /// rather than its path. Parsed here, once per change, rather than in the
+    /// view, which redraws sixty times a second while the text is moving.
+    private(set) var blocks: [TeleprompterBlock] = []
+
+    /// Where the caret is in the editor, so a pasted screenshot lands there.
+    /// Not published: the editor keeps it current itself, and redrawing the
+    /// pane on every caret move would buy nothing.
+    var selection: TextSelection?
 
     /// Points per second the text creeps upward at 1×. Slow: a comfortable
     /// reading pace is far slower than anyone guesses before trying it, and
@@ -67,6 +73,11 @@ final class TeleprompterStore: ObservableObject {
     /// Given rather than looked up, as in `SnippetStore`: a test against the
     /// real path would be rewriting the script of whoever ran it.
     let file: URL
+
+    /// Screenshots pasted into the script, next to it, so `![](…)` paths in
+    /// the file stay short and relative.
+    var imageFolder: URL { file.deletingLastPathComponent().appendingPathComponent("teleprompter-images", isDirectory: true) }
+    private var images: [String: NSImage] = [:]
 
     private var timer: Timer?
     private let saves = DebouncedWrite()
@@ -140,10 +151,98 @@ final class TeleprompterStore: ObservableObject {
 
     /// Inline markdown only, whitespace kept: line breaks and numbering are
     /// the layout of a script, and block parsing would fold them away. Text
-    /// that is not valid markdown is shown as written.
-    static func format(_ script: String) -> AttributedString {
+    /// that is not valid markdown is shown as written. The blocks are picked
+    /// out beforehand, by `TeleprompterBlock.parse`.
+    nonisolated static func format(_ script: String) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         return (try? AttributedString(markdown: script, options: options)) ?? AttributedString(script)
+    }
+
+    // MARK: - Pasting
+
+    /// ⌘V in the editor, for what the editor would get wrong by itself.
+    ///
+    /// Rich text from a page — a chat answer copied by selecting it — goes in
+    /// as the markdown it was rendered from, since its plain version has
+    /// already flattened the tables and headings. A screenshot is saved next
+    /// to the script and goes in as `![](…)`. Anything else is left to the
+    /// editor; false says so.
+    func paste(from pasteboard: NSPasteboard = .general) -> Bool {
+        if let html = pasteboard.string(forType: .html), let markdown = HTMLMarkdown.convert(html) {
+            replaceSelection(with: markdown)
+            return true
+        }
+        // Text first: copying from a browser often brings a picture along.
+        guard pasteboard.string(forType: .string) == nil,
+              let png = ClipboardStore.png(from: pasteboard),
+              let line = attachImage(png) else { return false }
+        insert(line)
+        return true
+    }
+
+    /// Puts `text` over the selection, as typing would, caret after it.
+    func replaceSelection(with text: String) {
+        var range = script.endIndex..<script.endIndex
+        if case .selection(let selected) = selection?.indices, selected.upperBound <= script.endIndex {
+            range = selected
+        }
+        let offset = script.distance(from: script.startIndex, to: range.lowerBound) + text.count
+        script.replaceSubrange(range, with: text)
+        selection = TextSelection(insertionPoint: caret(at: offset))
+    }
+
+    /// Writes the image into `imageFolder` and returns the line that shows it.
+    func attachImage(_ png: Data, at date: Date = Date()) -> String? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        let name = "\(formatter.string(from: date))-\(UUID().uuidString.prefix(8)).png"
+        do {
+            try FileManager.default.createDirectory(at: imageFolder, withIntermediateDirectories: true)
+            try png.write(to: imageFolder.appendingPathComponent(name), options: .atomic)
+        } catch {
+            NSLog("Cyclop: cannot save teleprompter image: \(error.localizedDescription)")
+            return nil
+        }
+        return "![](\(imageFolder.lastPathComponent)/\(name))"
+    }
+
+    /// On a line of its own at the caret, or at the end without one. The
+    /// caret is left just after it, so the next paste goes below.
+    func insert(_ line: String) {
+        var at = script.endIndex
+        if case .selection(let range) = selection?.indices, range.upperBound <= script.endIndex {
+            at = range.upperBound
+        }
+        let before = at > script.startIndex && script[script.index(before: at)] != "\n" ? "\n" : ""
+        let after = at < script.endIndex && script[at] != "\n" ? "\n" : ""
+        let offset = script.distance(from: script.startIndex, to: at) + before.count + line.count
+        script.insert(contentsOf: before + line + after, at: at)
+        selection = TextSelection(insertionPoint: caret(at: offset))
+    }
+
+    private func caret(at offset: Int) -> String.Index {
+        script.index(script.startIndex, offsetBy: offset, limitedBy: script.endIndex) ?? script.endIndex
+    }
+
+    /// The image behind `![](source)`: a path relative to the script's folder,
+    /// an absolute one, or a `file://` URL. Nothing from the network — the
+    /// script is read offline, like everything else in the panel but rates.
+    func image(_ source: String) -> NSImage? {
+        if let cached = images[source] { return cached }
+        let url: URL
+        if let parsed = URL(string: source), parsed.isFileURL {
+            url = parsed
+        } else if source.hasPrefix("/") || source.hasPrefix("~") {
+            url = URL(fileURLWithPath: (source as NSString).expandingTildeInPath)
+        } else if URL(string: source)?.scheme == nil {
+            url = file.deletingLastPathComponent().appendingPathComponent(source)
+        } else {
+            return nil
+        }
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        images[source] = image
+        return image
     }
 
     // MARK: - Storage
